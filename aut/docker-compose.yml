@@ -1,0 +1,17 @@
+services:
+  api:
+    build: ./api
+    container_name: aut-api
+    ports:
+      - "8080:8080"
+    cap_add:
+      - NET_ADMIN
+
+  db:
+    image: postgres:16
+    container_name: aut-db
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: aut
+    ports:
+      - "5432:5432"

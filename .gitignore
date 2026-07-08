@@ -1,0 +1,16 @@
+# Compiled binary
+bin/
+
+# Local attack history (generated at runtime, not source)
+gremlin-reports.json
+
+# Go build/test artifacts
+*.test
+*.out
+
+# OS/editor cruft
+.DS_Store
+*.swp
+
+# Docker volumes if any get created locally
+monitoring/data/

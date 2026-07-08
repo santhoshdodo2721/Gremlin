@@ -1,0 +1,6 @@
+{
+  "docker_socket": "/var/run/docker.sock",
+  "target_health_url": "http://localhost:8080/health",
+  "reports_file": "gremlin-reports.json",
+  "metrics_addr": ":9090"
+}
