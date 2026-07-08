@@ -1,0 +1,7 @@
+{
+  "jobs": [
+    { "attack": "container-kill", "target": "aut-api", "every_seconds": 120, "params": {} },
+    { "attack": "latency", "target": "aut-api", "every_seconds": 180, "params": { "delay_ms": "250", "duration_s": "15" } },
+    { "attack": "cpu", "target": "aut-api", "every_seconds": 300, "params": { "workers": "2", "duration_s": "20" } }
+  ]
+}

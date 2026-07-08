@@ -2,9 +2,13 @@ package main
 
 import (
 "context"
+"log/slog"
 "flag"
 "fmt"
 "os"
+"os/signal"
+"syscall"
+"time"
 
 "gremlin-in-a-box/internal/config"
 "gremlin-in-a-box/internal/controller"
@@ -13,6 +17,7 @@ import (
 "gremlin-in-a-box/internal/metrics"
 "gremlin-in-a-box/internal/plugins"
 "gremlin-in-a-box/internal/reports"
+"gremlin-in-a-box/internal/scheduler"
 )
 
 func main() {
@@ -64,10 +69,46 @@ fmt.Fprintln(os.Stderr, "metrics server error:", err)
 os.Exit(1)
 }
 
+case "schedule":
+runScheduleCmd(log, ctrl)
+
 default:
 printUsage()
 os.Exit(1)
 }
+}
+
+func runScheduleCmd(log *slog.Logger, ctrl *controller.Controller) {
+fs := flag.NewFlagSet("schedule", flag.ExitOnError)
+scheduleFile := fs.String("file", "schedule.json", "path to schedule config file")
+fs.Parse(os.Args[2:])
+
+sched, err := config.LoadSchedule(*scheduleFile)
+if err != nil {
+fmt.Fprintln(os.Stderr, "schedule error:", err)
+os.Exit(1)
+}
+if len(sched.Jobs) == 0 {
+fmt.Println("no jobs found in", *scheduleFile)
+os.Exit(1)
+}
+
+var jobs []scheduler.Job
+for _, j := range sched.Jobs {
+jobs = append(jobs, scheduler.Job{
+Attack: j.Attack,
+Target: j.Target,
+Params: plugins.Params(j.Params),
+Every:  time.Duration(j.EverySeconds) * time.Second,
+})
+fmt.Printf("scheduled: %-16s target=%-12s every=%ds\n", j.Attack, j.Target, j.EverySeconds)
+}
+
+ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+defer stop()
+
+fmt.Println("scheduler running - press Ctrl+C to stop")
+scheduler.Run(ctx, log, ctrl, jobs)
 }
 
 func runAttackCmd(ctrl *controller.Controller) {
@@ -118,4 +159,5 @@ fmt.Println("  gremlin status")
 fmt.Println("  gremlin attack --name <attack> --target <container> [flags]")
 fmt.Println("  gremlin report")
 fmt.Println("  gremlin serve-metrics")
+fmt.Println("  gremlin schedule --file schedule.json")
 }

@@ -38,3 +38,29 @@ return cfg, err
 }
 return cfg, nil
 }
+
+type ScheduleJob struct {
+Attack       string            `json:"attack"`
+Target       string            `json:"target"`
+EverySeconds int               `json:"every_seconds"`
+Params       map[string]string `json:"params"`
+}
+
+type Schedule struct {
+Jobs []ScheduleJob `json:"jobs"`
+}
+
+func LoadSchedule(path string) (Schedule, error) {
+var sched Schedule
+data, err := os.ReadFile(path)
+if err != nil {
+if os.IsNotExist(err) {
+return sched, nil
+}
+return sched, err
+}
+if err := json.Unmarshal(data, &sched); err != nil {
+return sched, err
+}
+return sched, nil
+}
