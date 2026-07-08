@@ -1,0 +1,62 @@
+name: Chaos CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+jobs:
+  chaos-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Build gremlin
+        run: go build -o bin/gremlin ./cmd/gremlin
+
+      - name: Start the Application Under Test
+        run: |
+          cd aut
+          docker compose up -d --build
+          echo "Waiting for AUT to become healthy..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8080/health > /dev/null; then
+              echo "AUT is healthy"
+              break
+            fi
+            sleep 2
+          done
+          curl -sf http://localhost:8080/health
+
+      - name: Run chaos attack - container-kill
+        run: ./bin/gremlin attack --name container-kill --target aut-api
+
+      - name: Run chaos attack - latency
+        run: ./bin/gremlin attack --name latency --target aut-api --delay-ms 200 --jitter-ms 20 --duration-s 10
+
+      - name: Run chaos attack - cpu
+        run: ./bin/gremlin attack --name cpu --target aut-api --workers 2 --duration-s 10
+
+      - name: Show report
+        run: ./bin/gremlin report
+
+      - name: Upload chaos report as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gremlin-reports
+          path: gremlin-reports.json
+
+      - name: Tear down AUT
+        if: always()
+        run: |
+          cd aut
+          docker compose down -v
