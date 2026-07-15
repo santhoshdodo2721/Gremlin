@@ -60,14 +60,26 @@
     ]
   },
   {
-    "commit_sha": "a3c56a703a56c6c14bf02d6d81fa0d07a71611fe",
+    "commit_sha": "3e6300d970fac33e7bd69b83fd2b9e161c1be86d",
     "results": [
       {
         "attack": "latency",
         "target": "aut-api",
         "breaking_point": 200,
         "unit": "ms",
-        "timestamp_unix": 1784106437
+        "timestamp_unix": 1784107003
+      }
+    ]
+  },
+  {
+    "commit_sha": "cde94debca4e35139d617f9c110687bfcdcb0a01",
+    "results": [
+      {
+        "attack": "latency",
+        "target": "aut-api",
+        "breaking_point": 200,
+        "unit": "ms",
+        "timestamp_unix": 1784107195
       }
     ]
   }

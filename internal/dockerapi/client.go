@@ -186,3 +186,65 @@ return err
 defer startResp.Body.Close()
 return nil
 }
+
+// Stats is a single snapshot of a container's resource usage, taken
+// directly from Docker's stats API (non-streaming, one-shot read).
+type Stats struct {
+CPUPercent float64
+MemUsedMB  float64
+MemLimitMB float64
+}
+
+// GetStats fetches one resource usage snapshot for a container by reading
+// the Docker Engine's /stats endpoint with streaming disabled.
+func (c *Client) GetStats(ctx context.Context, containerID string) (Stats, error) {
+resp, err := c.do(ctx, http.MethodGet, "/containers/"+containerID+"/stats?stream=false", nil)
+if err != nil {
+return Stats{}, err
+}
+defer resp.Body.Close()
+if resp.StatusCode != http.StatusOK {
+body, _ := io.ReadAll(resp.Body)
+return Stats{}, fmt.Errorf("stats: status %d: %s", resp.StatusCode, string(body))
+}
+
+var raw struct {
+CPUStats struct {
+CPUUsage struct {
+TotalUsage uint64 `json:"total_usage"`
+} `json:"cpu_usage"`
+SystemCPUUsage uint64 `json:"system_cpu_usage"`
+OnlineCPUs     uint32 `json:"online_cpus"`
+} `json:"cpu_stats"`
+PreCPUStats struct {
+CPUUsage struct {
+TotalUsage uint64 `json:"total_usage"`
+} `json:"cpu_usage"`
+SystemCPUUsage uint64 `json:"system_cpu_usage"`
+} `json:"precpu_stats"`
+MemoryStats struct {
+Usage uint64 `json:"usage"`
+Limit uint64 `json:"limit"`
+} `json:"memory_stats"`
+}
+if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+return Stats{}, err
+}
+
+cpuDelta := float64(raw.CPUStats.CPUUsage.TotalUsage) - float64(raw.PreCPUStats.CPUUsage.TotalUsage)
+sysDelta := float64(raw.CPUStats.SystemCPUUsage) - float64(raw.PreCPUStats.SystemCPUUsage)
+onlineCPUs := float64(raw.CPUStats.OnlineCPUs)
+if onlineCPUs == 0 {
+onlineCPUs = 1
+}
+cpuPercent := 0.0
+if sysDelta > 0 && cpuDelta > 0 {
+cpuPercent = (cpuDelta / sysDelta) * onlineCPUs * 100.0
+}
+
+return Stats{
+CPUPercent: cpuPercent,
+MemUsedMB:  float64(raw.MemoryStats.Usage) / 1024.0 / 1024.0,
+MemLimitMB: float64(raw.MemoryStats.Limit) / 1024.0 / 1024.0,
+}, nil
+}
