@@ -1,0 +1,50 @@
+[
+  {
+    "commit_sha": "local",
+    "results": [
+      {
+        "attack": "latency",
+        "target": "aut-api",
+        "breaking_point": 200,
+        "unit": "ms",
+        "timestamp_unix": 1784089701
+      }
+    ]
+  },
+  {
+    "commit_sha": "local",
+    "results": [
+      {
+        "attack": "latency",
+        "target": "aut-api",
+        "breaking_point": 200,
+        "unit": "ms",
+        "timestamp_unix": 1784089755
+      }
+    ]
+  },
+  {
+    "commit_sha": "local",
+    "results": [
+      {
+        "attack": "latency",
+        "target": "aut-api",
+        "breaking_point": 100,
+        "unit": "ms",
+        "timestamp_unix": 1784089870
+      }
+    ]
+  },
+  {
+    "commit_sha": "local",
+    "results": [
+      {
+        "attack": "latency",
+        "target": "aut-api",
+        "breaking_point": 200,
+        "unit": "ms",
+        "timestamp_unix": 1784090152
+      }
+    ]
+  }
+]
