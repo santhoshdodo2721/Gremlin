@@ -152,3 +152,37 @@ return "", err
 }
 return string(out), nil
 }
+
+// StartBackground runs cmd inside a container without waiting for it to
+// finish - used for attacks that need to run *while* we poll health in
+// parallel, rather than attacks like Exec() that block until completion.
+func (c *Client) StartBackground(ctx context.Context, containerID string, cmd []string) error {
+createBody, _ := json.Marshal(map[string]any{
+"Cmd":          cmd,
+"AttachStdout": false,
+"AttachStderr": false,
+})
+resp, err := c.do(ctx, http.MethodPost, "/containers/"+containerID+"/exec", bytes.NewReader(createBody))
+if err != nil {
+return err
+}
+defer resp.Body.Close()
+if resp.StatusCode != http.StatusCreated {
+body, _ := io.ReadAll(resp.Body)
+return fmt.Errorf("exec create: status %d: %s", resp.StatusCode, string(body))
+}
+var created struct {
+Id string `json:"Id"`
+}
+if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
+return err
+}
+
+startBody, _ := json.Marshal(map[string]any{"Detach": true, "Tty": false})
+startResp, err := c.do(ctx, http.MethodPost, "/exec/"+created.Id+"/start", bytes.NewReader(startBody))
+if err != nil {
+return err
+}
+defer startResp.Body.Close()
+return nil
+}

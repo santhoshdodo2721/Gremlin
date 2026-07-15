@@ -2,14 +2,16 @@ name: Chaos CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, tosh ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, tosh ]
   workflow_dispatch: {}
 
 jobs:
   chaos-test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repo
@@ -46,6 +48,11 @@ jobs:
       - name: Run chaos attack - cpu
         run: ./bin/gremlin attack --name cpu --target aut-api --workers 2 --duration-s 10
 
+      - name: Run resilience threshold test
+        run: |
+          ./bin/gremlin threshold --attack latency --target aut-api --commit ${{ github.sha }}
+          ./bin/gremlin threshold-check --tolerance-pct 20
+
       - name: Show report
         run: ./bin/gremlin report
 
@@ -54,6 +61,15 @@ jobs:
         with:
           name: gremlin-reports
           path: gremlin-reports.json
+
+      - name: Commit resilience history
+        if: success()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add resilience-history.json
+          git diff --staged --quiet || git commit -m "Update resilience history [skip ci]"
+          git push
 
       - name: Tear down AUT
         if: always()
