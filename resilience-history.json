@@ -70,5 +70,17 @@
         "timestamp_unix": 1784863966
       }
     ]
+  },
+  {
+    "commit_sha": "interactive",
+    "results": [
+      {
+        "attack": "latency",
+        "target": "aut-api",
+        "breaking_point": 200,
+        "unit": "ms",
+        "timestamp_unix": 1784864061
+      }
+    ]
   }
 ]
