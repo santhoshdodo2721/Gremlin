@@ -21,11 +21,6 @@ import (
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		printUsage()
-		os.Exit(1)
-	}
-
 	cfg, err := config.Load("config.json")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "config error:", err)
@@ -40,7 +35,15 @@ func main() {
 	m := metrics.NewCollector(store)
 	ctrl := controller.New(log, store, cfg.TargetHealthURL)
 
+	if len(os.Args) < 2 {
+		runInteractiveMenu(cfg, docker, ctrl, store, m)
+		return
+	}
+
 	switch os.Args[1] {
+	case "menu":
+		runInteractiveMenu(cfg, docker, ctrl, store, m)
+
 	case "version":
 		fmt.Println("gremlin v0.1.0")
 
@@ -74,6 +77,9 @@ func main() {
 
 	case "threshold-check":
 		runThresholdCheckCmd("resilience-history.json")
+
+	case "loadtest":
+		runLoadtestCmd(docker)
 
 	case "schedule":
 		runScheduleCmd(log, ctrl)
@@ -160,10 +166,15 @@ func printUsage() {
 	fmt.Println("gremlin - chaos engineering CLI")
 	fmt.Println("")
 	fmt.Println("Usage:")
+	fmt.Println("  gremlin                (launches interactive menu)")
+	fmt.Println("  gremlin menu")
 	fmt.Println("  gremlin version")
 	fmt.Println("  gremlin status")
 	fmt.Println("  gremlin attack --name <attack> --target <container> [flags]")
 	fmt.Println("  gremlin report")
 	fmt.Println("  gremlin serve-metrics")
 	fmt.Println("  gremlin schedule --file schedule.json")
+	fmt.Println("  gremlin threshold --attack latency|cpu --target <container>")
+	fmt.Println("  gremlin threshold-check")
+	fmt.Println("  gremlin loadtest --target <container> --url <http endpoint>")
 }

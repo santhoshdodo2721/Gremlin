@@ -58,5 +58,17 @@
         "timestamp_unix": 1784090853
       }
     ]
+  },
+  {
+    "commit_sha": "interactive",
+    "results": [
+      {
+        "attack": "cpu",
+        "target": "aut-api",
+        "breaking_point": 8,
+        "unit": "workers",
+        "timestamp_unix": 1784863966
+      }
+    ]
   }
 ]
