@@ -1,127 +1,13 @@
 [
   {
-    "commit_sha": "local",
+    "commit_sha": "04cc16232373a9174f099b18f5fba0bc04b5338f",
     "results": [
       {
         "attack": "latency",
         "target": "aut-api",
         "breaking_point": 200,
         "unit": "ms",
-        "timestamp_unix": 1784089701
-      }
-    ]
-  },
-  {
-    "commit_sha": "local",
-    "results": [
-      {
-        "attack": "latency",
-        "target": "aut-api",
-        "breaking_point": 200,
-        "unit": "ms",
-        "timestamp_unix": 1784089755
-      }
-    ]
-  },
-  {
-    "commit_sha": "local",
-    "results": [
-      {
-        "attack": "latency",
-        "target": "aut-api",
-        "breaking_point": 100,
-        "unit": "ms",
-        "timestamp_unix": 1784089870
-      }
-    ]
-  },
-  {
-    "commit_sha": "local",
-    "results": [
-      {
-        "attack": "latency",
-        "target": "aut-api",
-        "breaking_point": 200,
-        "unit": "ms",
-        "timestamp_unix": 1784090152
-      }
-    ]
-  },
-  {
-    "commit_sha": "438fb0028654b3b3ea5d8e69267b73e78b770821",
-    "results": [
-      {
-        "attack": "latency",
-        "target": "aut-api",
-        "breaking_point": 200,
-        "unit": "ms",
-        "timestamp_unix": 1784090853
-      }
-    ]
-  },
-  {
-    "commit_sha": "3e6300d970fac33e7bd69b83fd2b9e161c1be86d",
-    "results": [
-      {
-        "attack": "latency",
-        "target": "aut-api",
-        "breaking_point": 200,
-        "unit": "ms",
-        "timestamp_unix": 1784107003
-      }
-    ]
-  },
-  {
-    "commit_sha": "cde94debca4e35139d617f9c110687bfcdcb0a01",
-    "results": [
-      {
-        "attack": "latency",
-        "target": "aut-api",
-        "breaking_point": 200,
-        "unit": "ms",
-        "timestamp_unix": 1784107195
-      }
-    ]
-  },
-  {
- tosh
-    "commit_sha": "interactive",
-    "results": [
-      {
-        "attack": "cpu",
-        "target": "aut-api",
-        "breaking_point": 8,
-        "unit": "workers",
-        "timestamp_unix": 1784863966
-      }
-    ]
-  },
-  {
-    "commit_sha": "interactive",
-    "results": [
-      {
-        "attack": "latency",
-        "target": "aut-api",
-        "breaking_point": 200,
-        "unit": "ms",
-        "timestamp_unix": 1784864061
-      }
-    ]
-  },
-  {
-    "commit_sha": "0f5f59baaa1475b1afdbab86f829c80f902ca6ea",
-    "commit_sha": "4014ff39c3033d6e6cddcce201db9a65355903ce",
-main
-    "results": [
-      {
-        "attack": "latency",
-        "target": "aut-api",
-        "breaking_point": 200,
-        "unit": "ms",
- tosh
-        "timestamp_unix": 1784864736
-        "timestamp_unix": 1784107638
- main
+        "timestamp_unix": 1784874252
       }
     ]
   }

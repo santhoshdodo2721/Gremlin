@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	"gremlin-in-a-box/internal/config"
@@ -18,41 +19,174 @@ import (
 	"gremlin-in-a-box/internal/tui"
 )
 
+var metricsRunning = false
+
 func runInteractiveMenu(cfg config.Config, docker *dockerapi.Client, ctrl *controller.Controller, store *reports.Store, m *metrics.Collector) {
 	for {
 		tui.Clear()
 		tui.Banner()
+		printReminders(cfg, metricsRunning)
 
 		choice := tui.Menu("Main Menu", []string{
-			"Run an attack (container-kill / latency / cpu)",
+			"Check system status (Docker / test app / dashboard)",
+			"Run a single attack (container-kill / latency / cpu)",
 			"Find resilience breaking point (auto-escalating threshold test)",
 			"Run a load test (find max concurrent users)",
+			"Run the FULL test suite (all attacks + threshold + load test, one command)",
 			"View attack report history",
 			"View resilience history",
 			"Show registered attack plugins",
-			"Start metrics server (blocks - Ctrl+C to stop)",
+			"Start metrics server in the background (for Grafana/Prometheus)",
 		})
 
 		switch choice {
 		case 0:
-			attackMenu(ctrl)
+			checkSystemStatus(cfg)
 		case 1:
-			thresholdMenu(docker, cfg)
+			attackMenu(ctrl)
 		case 2:
-			loadtestMenu(docker)
+			thresholdMenu(docker, cfg)
 		case 3:
-			viewReports(store)
+			loadtestMenu(docker)
 		case 4:
-			viewResilienceHistory()
+			runFullSuite(docker, ctrl, cfg)
 		case 5:
-			viewPlugins()
+			viewReports(store)
 		case 6:
-			fmt.Println(tui.Yellow + "serving metrics on " + cfg.MetricsAddr + " - Ctrl+C to stop" + tui.Reset)
-			m.Serve(cfg.MetricsAddr)
+			viewResilienceHistory()
+		case 7:
+			viewPlugins()
+		case 8:
+			startMetricsBackground(cfg, m)
 		default:
 			return
 		}
 	}
+}
+
+// printReminders shows the always-visible guidance banner: where to view
+// the dashboard, and what needs to be running before anything will work.
+func printReminders(cfg config.Config, metricsOn bool) {
+	fmt.Println(tui.Gray + "  before running attacks: make sure Docker is running and the" + tui.Reset)
+	fmt.Println(tui.Gray + "  test app is up (cd aut && docker compose up -d)" + tui.Reset)
+	if metricsOn {
+		fmt.Println(tui.Green + "  metrics server: running in background on " + cfg.MetricsAddr + tui.Reset)
+	} else {
+		fmt.Println(tui.Gray + "  metrics server: not running - start it from the menu to feed Grafana" + tui.Reset)
+	}
+	fmt.Println(tui.Gray + "  dashboard: http://localhost:3001  (Grafana, once monitoring stack is up)" + tui.Reset)
+	fmt.Println()
+}
+
+// checkSystemStatus gives a plain-language readout of whether the pieces
+// this tool depends on are actually reachable right now, instead of
+// letting the user discover it via a confusing failure three menus deep.
+func checkSystemStatus(cfg config.Config) {
+	tui.Clear()
+	fmt.Println(tui.Bold + "System status" + tui.Reset)
+	fmt.Println()
+
+	client := http.Client{Timeout: 3 * time.Second}
+
+	fmt.Print("test app (" + cfg.TargetHealthURL + ")... ")
+	resp, err := client.Get(cfg.TargetHealthURL)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		fmt.Println(tui.Red + "NOT REACHABLE" + tui.Reset)
+		fmt.Println(tui.Yellow + "  fix: cd aut && docker compose up -d --build" + tui.Reset)
+	} else {
+		fmt.Println(tui.Green + "OK" + tui.Reset)
+		resp.Body.Close()
+	}
+
+	fmt.Print("Grafana dashboard (http://localhost:3001)... ")
+	resp2, err2 := client.Get("http://localhost:3001")
+	if err2 != nil {
+		fmt.Println(tui.Yellow + "NOT RUNNING" + tui.Reset)
+		fmt.Println(tui.Yellow + "  fix: cd monitoring && docker compose up -d" + tui.Reset)
+	} else {
+		fmt.Println(tui.Green + "OK" + tui.Reset)
+		resp2.Body.Close()
+	}
+
+	fmt.Print("Prometheus (http://localhost:9091)... ")
+	resp3, err3 := client.Get("http://localhost:9091")
+	if err3 != nil {
+		fmt.Println(tui.Yellow + "NOT RUNNING" + tui.Reset)
+		fmt.Println(tui.Yellow + "  fix: cd monitoring && docker compose up -d" + tui.Reset)
+	} else {
+		fmt.Println(tui.Green + "OK" + tui.Reset)
+		resp3.Body.Close()
+	}
+
+	if !metricsRunning {
+		fmt.Println()
+		fmt.Println(tui.Yellow + "note: metrics server is not running from this menu yet - Prometheus" + tui.Reset)
+		fmt.Println(tui.Yellow + "has nothing to scrape until you start it (option 9)." + tui.Reset)
+	}
+
+	tui.Pause()
+}
+
+// runFullSuite is the single-command option: every attack type, the
+// threshold test, and a load test, run back to back with no further
+// prompts, then a summary. This is what someone runs when they just want
+// "test everything" without walking through each menu separately.
+func runFullSuite(docker *dockerapi.Client, ctrl *controller.Controller, cfg config.Config) {
+	tui.Clear()
+	fmt.Println(tui.Bold + "Running the full test suite - this will take a few minutes" + tui.Reset)
+	fmt.Println()
+
+	target := tui.AskDefault("Target container", "aut-api")
+	fmt.Println()
+
+	tui.Spin("container-kill attack", func() error {
+		return ctrl.RunAttack(context.Background(), "container-kill", target, plugins.Params{})
+	})
+
+	tui.Spin("latency attack (300ms, 15s)", func() error {
+		return ctrl.RunAttack(context.Background(), "latency", target, plugins.Params{
+			"delay_ms": "300", "jitter_ms": "20", "duration_s": "15",
+		})
+	})
+
+	tui.Spin("cpu attack (2 workers, 15s)", func() error {
+		return ctrl.RunAttack(context.Background(), "cpu", target, plugins.Params{
+			"workers": "2", "duration_s": "15",
+		})
+	})
+
+	var latResult threshold.Result
+	tui.Spin("resilience threshold test (latency)", func() error {
+		net := network.NewManager(docker, "eth0")
+		var err error
+		latResult, err = threshold.RunLatencyThreshold(context.Background(), net, target, cfg.TargetHealthURL)
+		return err
+	})
+	if latResult.BreakingPoint > 0 {
+		hist := resilience.NewHistory("resilience-history.json")
+		hist.Append("interactive-full-suite", []threshold.Result{latResult})
+	}
+
+	var loadResult loadtest.Result
+	tui.Spin("load test (concurrent users)", func() error {
+		var err error
+		loadResult, err = loadtest.Run(context.Background(), docker, target, cfg.TargetHealthURL)
+		return err
+	})
+
+	fmt.Println()
+	fmt.Println(tui.Bold + tui.Green + "Full suite complete." + tui.Reset)
+	fmt.Println()
+	fmt.Println(tui.Bold + "Summary:" + tui.Reset)
+	fmt.Printf("  latency breaking point:     %d ms\n", latResult.BreakingPoint)
+	fmt.Printf("  max concurrent users:       %d\n", loadResult.MaxConcurrentUsers)
+	fmt.Printf("  CPU usage at max load:      %.1f%%\n", loadResult.CPUPercent)
+	fmt.Printf("  memory usage at max load:   %.1f MB\n", loadResult.MemUsedMB)
+	fmt.Println()
+	fmt.Println(tui.Cyan + "View full results and trends in Grafana: http://localhost:3001" + tui.Reset)
+	fmt.Println(tui.Cyan + "(make sure the monitoring stack is up: cd monitoring && docker compose up -d)" + tui.Reset)
+
+	tui.Pause()
 }
 
 func attackMenu(ctrl *controller.Controller) {
@@ -175,6 +309,31 @@ func viewPlugins() {
 		p, _ := plugins.Get(name)
 		fmt.Printf("  %s%-16s%s %s\n", tui.Cyan, name, tui.Reset, p.Describe())
 	}
-	_ = time.Now
+	tui.Pause()
+}
+
+// startMetricsBackground launches the metrics HTTP server in a goroutine
+// instead of blocking, so the rest of the menu stays usable while it runs.
+// Calling this twice is harmless - the second call is ignored, since only
+// one listener can bind the port anyway.
+func startMetricsBackground(cfg config.Config, m *metrics.Collector) {
+	tui.Clear()
+	if metricsRunning {
+		fmt.Println(tui.Yellow + "metrics server is already running on " + cfg.MetricsAddr + tui.Reset)
+		tui.Pause()
+		return
+	}
+
+	metricsRunning = true
+	go func() {
+		m.Serve(cfg.MetricsAddr)
+	}()
+
+	fmt.Println(tui.Green + "metrics server started in the background on " + cfg.MetricsAddr + tui.Reset)
+	fmt.Println(tui.Gray + "it will keep running for the rest of this session - you can use every" + tui.Reset)
+	fmt.Println(tui.Gray + "other menu option normally while it serves Prometheus in the background." + tui.Reset)
+	fmt.Println()
+	fmt.Println(tui.Cyan + "Prometheus should scrape it at http://172.17.0.1" + cfg.MetricsAddr + "/metrics" + tui.Reset)
+	fmt.Println(tui.Cyan + "View the dashboard at http://localhost:3001" + tui.Reset)
 	tui.Pause()
 }
