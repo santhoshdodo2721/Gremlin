@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "commit_sha": "04cc16232373a9174f099b18f5fba0bc04b5338f",
+    "results": [
+      {
+        "attack": "latency",
+        "target": "aut-api",
+        "breaking_point": 200,
+        "unit": "ms",
+        "timestamp_unix": 1784874252
+      }
+    ]
+  }
+]
