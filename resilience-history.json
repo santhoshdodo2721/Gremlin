@@ -12,74 +12,14 @@
     ]
   },
   {
-    "commit_sha": "interactive-full-suite",
+    "commit_sha": "2542781ecd7cb92e8356850b0bd0af3dfa31954f",
     "results": [
       {
         "attack": "latency",
         "target": "aut-api",
         "breaking_point": 200,
         "unit": "ms",
-        "timestamp_unix": 1784886722
-      }
-    ]
-  },
-  {
-    "commit_sha": "interactive-full-suite",
-    "results": [
-      {
-        "attack": "latency",
-        "target": "aut-api",
-        "breaking_point": 200,
-        "unit": "ms",
-        "timestamp_unix": 1784889176
-      }
-    ]
-  },
-  {
-    "commit_sha": "interactive-full-suite",
-    "results": [
-      {
-        "attack": "latency",
-        "target": "aut-api",
-        "breaking_point": 200,
-        "unit": "ms",
-        "timestamp_unix": 1784889756
-      }
-    ]
-  },
-  {
-    "commit_sha": "interactive",
-    "results": [
-      {
-        "attack": "latency",
-        "target": "aut-api",
-        "breaking_point": 200,
-        "unit": "ms",
-        "timestamp_unix": 1784890418
-      }
-    ]
-  },
-  {
-    "commit_sha": "0e16f1864d5d08f4fc4001457c56c61c27aa9704",
-    "results": [
-      {
-        "attack": "latency",
-        "target": "aut-api",
-        "breaking_point": 200,
-        "unit": "ms",
-        "timestamp_unix": 1786119870
-      }
-    ]
-  },
-  {
-    "commit_sha": "f946788f49ac50c6949f5dcec7825e19fb9e7da7",
-    "results": [
-      {
-        "attack": "latency",
-        "target": "aut-api",
-        "breaking_point": 200,
-        "unit": "ms",
-        "timestamp_unix": 1786120248
+        "timestamp_unix": 1784874384
       }
     ]
   }
