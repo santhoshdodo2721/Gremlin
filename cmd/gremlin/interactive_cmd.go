@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"gremlin-in-a-box/internal/config"
@@ -27,6 +30,11 @@ func runInteractiveMenu(cfg config.Config, docker *dockerapi.Client, ctrl *contr
 		tui.Banner()
 		printReminders(cfg, metricsRunning)
 
+		metricsOpt := "Start metrics server in the background (for Grafana/Prometheus)"
+		if metricsRunning {
+			metricsOpt = "Stop metrics server (currently running in background)"
+		}
+
 		choice := tui.Menu("Main Menu", []string{
 			"Check system status (Docker / test app / dashboard)",
 			"Run a single attack (container-kill / latency / cpu)",
@@ -36,7 +44,7 @@ func runInteractiveMenu(cfg config.Config, docker *dockerapi.Client, ctrl *contr
 			"View attack report history",
 			"View resilience history",
 			"Show registered attack plugins",
-			"Start metrics server in the background (for Grafana/Prometheus)",
+			metricsOpt,
 		})
 
 		switch choice {
@@ -57,15 +65,21 @@ func runInteractiveMenu(cfg config.Config, docker *dockerapi.Client, ctrl *contr
 		case 7:
 			viewPlugins()
 		case 8:
-			startMetricsBackground(cfg, m)
+			toggleMetricsBackground(cfg, m)
 		default:
+			if metricsRunning {
+				fmt.Println()
+				fmt.Println(tui.Yellow + "the metrics server is still running in the background." + tui.Reset)
+				confirm := tui.AskDefault("quitting will stop it too - quit anyway? (y/n)", "n")
+				if confirm != "y" && confirm != "yes" {
+					continue
+				}
+			}
 			return
 		}
 	}
 }
 
-// printReminders shows the always-visible guidance banner: where to view
-// the dashboard, and what needs to be running before anything will work.
 func printReminders(cfg config.Config, metricsOn bool) {
 	fmt.Println(tui.Gray + "  before running attacks: make sure Docker is running and the" + tui.Reset)
 	fmt.Println(tui.Gray + "  test app is up (cd aut && docker compose up -d)" + tui.Reset)
@@ -78,9 +92,6 @@ func printReminders(cfg config.Config, metricsOn bool) {
 	fmt.Println()
 }
 
-// checkSystemStatus gives a plain-language readout of whether the pieces
-// this tool depends on are actually reachable right now, instead of
-// letting the user discover it via a confusing failure three menus deep.
 func checkSystemStatus(cfg config.Config) {
 	tui.Clear()
 	fmt.Println(tui.Bold + "System status" + tui.Reset)
@@ -118,19 +129,17 @@ func checkSystemStatus(cfg config.Config) {
 		resp3.Body.Close()
 	}
 
-	if !metricsRunning {
-		fmt.Println()
-		fmt.Println(tui.Yellow + "note: metrics server is not running from this menu yet - Prometheus" + tui.Reset)
-		fmt.Println(tui.Yellow + "has nothing to scrape until you start it (option 9)." + tui.Reset)
+	fmt.Print("metrics server (background, this session)... ")
+	if metricsRunning {
+		fmt.Println(tui.Green + "RUNNING" + tui.Reset)
+	} else {
+		fmt.Println(tui.Yellow + "NOT STARTED" + tui.Reset)
+		fmt.Println(tui.Yellow + "  fix: start it from the main menu (option 9)" + tui.Reset)
 	}
 
 	tui.Pause()
 }
 
-// runFullSuite is the single-command option: every attack type, the
-// threshold test, and a load test, run back to back with no further
-// prompts, then a summary. This is what someone runs when they just want
-// "test everything" without walking through each menu separately.
 func runFullSuite(docker *dockerapi.Client, ctrl *controller.Controller, cfg config.Config) {
 	tui.Clear()
 	fmt.Println(tui.Bold + "Running the full test suite - this will take a few minutes" + tui.Reset)
@@ -189,34 +198,101 @@ func runFullSuite(docker *dockerapi.Client, ctrl *controller.Controller, cfg con
 	tui.Pause()
 }
 
+// attackMenu now offers every plugin individually, plus "all three
+// sequentially", plus a continuous mode that keeps running until the user
+// presses Ctrl+C.
 func attackMenu(ctrl *controller.Controller) {
 	tui.Clear()
 	names := plugins.List()
-	choice := tui.Menu("Choose an attack", names)
+	options := append([]string{}, names...)
+	options = append(options, "ALL THREE (container-kill, latency, cpu - one after another)")
+
+	choice := tui.Menu("Choose an attack", options)
 	if choice < 0 {
 		return
 	}
-	attackName := names[choice]
-	target := tui.AskDefault("Target container", "aut-api")
 
+	target := tui.AskDefault("Target container", "aut-api")
+	runAll := choice == len(options)-1
+
+	var attackName string
 	params := plugins.Params{}
-	switch attackName {
-	case "latency":
-		params["delay_ms"] = tui.AskDefault("Delay (ms)", "300")
-		params["jitter_ms"] = tui.AskDefault("Jitter (ms)", "20")
-		params["duration_s"] = tui.AskDefault("Duration (s)", "15")
-	case "cpu":
-		params["workers"] = tui.AskDefault("CPU workers", "2")
-		params["duration_s"] = tui.AskDefault("Duration (s)", "15")
-	case "container-kill":
-		params["restart"] = tui.AskDefault("Restart after stopping? (true/false)", "true")
+	if !runAll {
+		attackName = names[choice]
+		switch attackName {
+		case "latency":
+			params["delay_ms"] = tui.AskDefault("Delay (ms)", "300")
+			params["jitter_ms"] = tui.AskDefault("Jitter (ms)", "20")
+			params["duration_s"] = tui.AskDefault("Duration (s)", "15")
+		case "cpu":
+			params["workers"] = tui.AskDefault("CPU workers", "2")
+			params["duration_s"] = tui.AskDefault("Duration (s)", "15")
+		case "container-kill":
+			params["restart"] = tui.AskDefault("Restart after stopping? (true/false)", "true")
+		}
 	}
 
-	fmt.Println()
-	tui.Spin(fmt.Sprintf("running %s against %s", attackName, target), func() error {
-		return ctrl.RunAttack(context.Background(), attackName, target, params)
+	modeChoice := tui.Menu("How should it run?", []string{
+		"Once",
+		"Continuously, until I stop it (Ctrl+C)",
 	})
-	tui.Pause()
+	if modeChoice < 0 {
+		return
+	}
+	continuous := modeChoice == 1
+
+	fmt.Println()
+
+	runOnce := func() error {
+		if runAll {
+			if err := ctrl.RunAttack(context.Background(), "container-kill", target, plugins.Params{}); err != nil {
+				return err
+			}
+			if err := ctrl.RunAttack(context.Background(), "latency", target, plugins.Params{
+				"delay_ms": "300", "jitter_ms": "20", "duration_s": "10",
+			}); err != nil {
+				return err
+			}
+			return ctrl.RunAttack(context.Background(), "cpu", target, plugins.Params{
+				"workers": "2", "duration_s": "10",
+			})
+		}
+		return ctrl.RunAttack(context.Background(), attackName, target, params)
+	}
+
+	if !continuous {
+		label := attackName
+		if runAll {
+			label = "all three attacks"
+		}
+		tui.Spin(fmt.Sprintf("running %s against %s", label, target), runOnce)
+		tui.Pause()
+		return
+	}
+
+	fmt.Println(tui.Yellow + "running continuously - press Ctrl+C to stop" + tui.Reset)
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+
+	round := 1
+	for {
+		select {
+		case <-sigCh:
+			fmt.Println()
+			fmt.Printf("%sstopped after %d round(s)%s\n", tui.Green, round-1, tui.Reset)
+			tui.Pause()
+			return
+		default:
+		}
+
+		label := attackName
+		if runAll {
+			label = "all three attacks"
+		}
+		tui.Spin(fmt.Sprintf("round %d: %s against %s", round, label, target), runOnce)
+		round++
+		time.Sleep(2 * time.Second)
+	}
 }
 
 func thresholdMenu(docker *dockerapi.Client, cfg config.Config) {
@@ -312,26 +388,44 @@ func viewPlugins() {
 	tui.Pause()
 }
 
-// startMetricsBackground launches the metrics HTTP server in a goroutine
-// instead of blocking, so the rest of the menu stays usable while it runs.
-// Calling this twice is harmless - the second call is ignored, since only
-// one listener can bind the port anyway.
-func startMetricsBackground(cfg config.Config, m *metrics.Collector) {
+var metricsServer *http.Server
+
+func toggleMetricsBackground(cfg config.Config, m *metrics.Collector) {
 	tui.Clear()
 	if metricsRunning {
-		fmt.Println(tui.Yellow + "metrics server is already running on " + cfg.MetricsAddr + tui.Reset)
+		if metricsServer != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			_ = metricsServer.Shutdown(ctx)
+			metricsServer = nil
+		}
+		metricsRunning = false
+		fmt.Println(tui.Yellow + "metrics server stopped." + tui.Reset)
 		tui.Pause()
 		return
 	}
 
+	ln, err := m.TryListen(cfg.MetricsAddr)
+	if err != nil {
+		fmt.Println(tui.Red + "failed to start metrics server on " + cfg.MetricsAddr + ": " + err.Error() + tui.Reset)
+		fmt.Println(tui.Yellow + "hint: another process (e.g. background gremlin) is using port " + cfg.MetricsAddr + tui.Reset)
+		tui.Pause()
+		return
+	}
+
+	metricsServer = &http.Server{
+		Handler: m.Handler(),
+	}
 	metricsRunning = true
 	go func() {
-		m.Serve(cfg.MetricsAddr)
+		if err := metricsServer.Serve(ln); err != nil && err != http.ErrServerClosed {
+			metricsRunning = false
+			metricsServer = nil
+		}
 	}()
 
 	fmt.Println(tui.Green + "metrics server started in the background on " + cfg.MetricsAddr + tui.Reset)
-	fmt.Println(tui.Gray + "it will keep running for the rest of this session - you can use every" + tui.Reset)
-	fmt.Println(tui.Gray + "other menu option normally while it serves Prometheus in the background." + tui.Reset)
+	fmt.Println(tui.Gray + "it stays running while you use other options until turned off via option 9." + tui.Reset)
 	fmt.Println()
 	fmt.Println(tui.Cyan + "Prometheus should scrape it at http://172.17.0.1" + cfg.MetricsAddr + "/metrics" + tui.Reset)
 	fmt.Println(tui.Cyan + "View the dashboard at http://localhost:3001" + tui.Reset)
