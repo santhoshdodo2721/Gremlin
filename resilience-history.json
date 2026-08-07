@@ -1,19 +1,24 @@
 [
   {
-<<<<<<< HEAD
     "commit_sha": "04cc16232373a9174f099b18f5fba0bc04b5338f",
-=======
-    "commit_sha": "interactive-full-suite",
->>>>>>> 31cc89d (update the cli and make the instrucrions in the tool)
     "results": [
       {
         "attack": "latency",
         "target": "aut-api",
         "breaking_point": 200,
         "unit": "ms",
-<<<<<<< HEAD
         "timestamp_unix": 1784874252
-=======
+      }
+    ]
+  },
+  {
+    "commit_sha": "interactive-full-suite",
+    "results": [
+      {
+        "attack": "latency",
+        "target": "aut-api",
+        "breaking_point": 200,
+        "unit": "ms",
         "timestamp_unix": 1784886722
       }
     ]
@@ -51,7 +56,6 @@
         "breaking_point": 200,
         "unit": "ms",
         "timestamp_unix": 1784890418
->>>>>>> 31cc89d (update the cli and make the instrucrions in the tool)
       }
     ]
   }
