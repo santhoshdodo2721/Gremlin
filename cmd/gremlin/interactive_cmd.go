@@ -30,6 +30,11 @@ func runInteractiveMenu(cfg config.Config, docker *dockerapi.Client, ctrl *contr
 		tui.Banner()
 		printReminders(cfg, metricsRunning)
 
+		metricsOpt := "Start metrics server in the background (for Grafana/Prometheus)"
+		if metricsRunning {
+			metricsOpt = "Stop metrics server (currently running in background)"
+		}
+
 		choice := tui.Menu("Main Menu", []string{
 			"Check system status (Docker / test app / dashboard)",
 			"Run a single attack (container-kill / latency / cpu)",
@@ -39,7 +44,7 @@ func runInteractiveMenu(cfg config.Config, docker *dockerapi.Client, ctrl *contr
 			"View attack report history",
 			"View resilience history",
 			"Show registered attack plugins",
-			"Start metrics server in the background (for Grafana/Prometheus)",
+			metricsOpt,
 		})
 
 		switch choice {
@@ -60,7 +65,7 @@ func runInteractiveMenu(cfg config.Config, docker *dockerapi.Client, ctrl *contr
 		case 7:
 			viewPlugins()
 		case 8:
-			startMetricsBackground(cfg, m)
+			toggleMetricsBackground(cfg, m)
 		default:
 			if metricsRunning {
 				fmt.Println()
@@ -383,25 +388,44 @@ func viewPlugins() {
 	tui.Pause()
 }
 
-func startMetricsBackground(cfg config.Config, m *metrics.Collector) {
+var metricsServer *http.Server
+
+func toggleMetricsBackground(cfg config.Config, m *metrics.Collector) {
 	tui.Clear()
 	if metricsRunning {
-		fmt.Println(tui.Yellow + "metrics server is already running on " + cfg.MetricsAddr + tui.Reset)
+		if metricsServer != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			_ = metricsServer.Shutdown(ctx)
+			metricsServer = nil
+		}
+		metricsRunning = false
+		fmt.Println(tui.Yellow + "metrics server stopped." + tui.Reset)
 		tui.Pause()
 		return
 	}
 
+	ln, err := m.TryListen(cfg.MetricsAddr)
+	if err != nil {
+		fmt.Println(tui.Red + "failed to start metrics server on " + cfg.MetricsAddr + ": " + err.Error() + tui.Reset)
+		fmt.Println(tui.Yellow + "hint: another process (e.g. background gremlin) is using port " + cfg.MetricsAddr + tui.Reset)
+		tui.Pause()
+		return
+	}
+
+	metricsServer = &http.Server{
+		Handler: m.Handler(),
+	}
 	metricsRunning = true
 	go func() {
-		if err := m.Serve(cfg.MetricsAddr); err != nil {
+		if err := metricsServer.Serve(ln); err != nil && err != http.ErrServerClosed {
 			metricsRunning = false
+			metricsServer = nil
 		}
 	}()
 
 	fmt.Println(tui.Green + "metrics server started in the background on " + cfg.MetricsAddr + tui.Reset)
-	fmt.Println(tui.Gray + "it stays running for the rest of this session - every other menu" + tui.Reset)
-	fmt.Println(tui.Gray + "option works normally while it serves Prometheus in the background." + tui.Reset)
-	fmt.Println(tui.Yellow + "note: it stops if you quit the whole program, not just this menu screen." + tui.Reset)
+	fmt.Println(tui.Gray + "it stays running while you use other options until turned off via option 9." + tui.Reset)
 	fmt.Println()
 	fmt.Println(tui.Cyan + "Prometheus should scrape it at http://172.17.0.1" + cfg.MetricsAddr + "/metrics" + tui.Reset)
 	fmt.Println(tui.Cyan + "View the dashboard at http://localhost:3001" + tui.Reset)
