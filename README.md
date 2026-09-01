@@ -59,6 +59,11 @@ Bring up the application under test:
     docker compose up -d --build
     curl http://localhost:8080/health
 
+Install dependencies:
+
+    go mod tidy
+    go mod download
+
 Build Gremlin:
 
     go build -o bin/gremlin ./cmd/gremlin
