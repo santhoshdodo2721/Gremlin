@@ -20,7 +20,12 @@ mu   sync.Mutex
 }
 
 func NewHistory(path string) *History {
-return &History{path: path}
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		if _, errParent := os.Stat("../" + path); errParent == nil {
+			path = "../" + path
+		}
+	}
+	return &History{path: path}
 }
 
 func (h *History) load() ([]Entry, error) {
