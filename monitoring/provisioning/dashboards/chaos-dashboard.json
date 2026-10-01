@@ -17,11 +17,27 @@
   },
   "editable": true,
   "fiscalYearStartMonth": 0,
-  "graphTooltip": 0,
-  "id": 1,
+  "graphTooltip": 1,
+  "id": null,
   "links": [],
   "liveNow": false,
   "panels": [
+    {
+      "id": 10,
+      "type": "text",
+      "title": "",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 4
+      },
+      "options": {
+        "mode": "html",
+        "content": "<img src=\"/public/img/gremlin-header.svg?v=3\" width=\"100%\" alt=\"Gremlin \u2014 experiment review\" />"
+      },
+      "transparent": true
+    },
     {
       "datasource": {
         "type": "prometheus",
@@ -30,36 +46,48 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "fixedColor": "red",
-            "mode": "continuous-YlRd"
+            "mode": "fixed",
+            "fixedColor": "#8bbede"
           },
-          "mappings": [],
-          "max": 500,
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "Not measured",
+                  "color": "#94a3b8"
+                }
+              }
+            }
+          ],
           "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "#8bbede",
                 "value": null
               }
             ]
           },
-          "unitScale": true
+          "unitScale": true,
+          "decimals": 0,
+          "noValue": "Not measured"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 6,
-        "w": 6,
         "x": 0,
-        "y": 0
+        "y": 4,
+        "w": 4,
+        "h": 5
       },
       "id": 1,
       "options": {
-        "minVizHeight": 75,
-        "minVizWidth": 75,
-        "orientation": "auto",
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "showUnfilled": true,
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -67,21 +95,33 @@
           "fields": "",
           "values": false
         },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true,
-        "sizing": "auto"
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "wideLayout": false,
+        "text": {
+          "valueSize": 48,
+          "titleSize": 12
+        }
       },
       "pluginVersion": "10.3.3",
       "targets": [
         {
           "expr": "gremlin_attacks_total",
           "instant": true,
-          "refId": "A"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "legendFormat": "Tests run"
         }
       ],
-      "title": "Total Attacks Run",
-      "transparent": true,
-      "type": "gauge"
+      "title": "Saved tests",
+      "transparent": false,
+      "type": "stat",
+      "description": "Total tests saved in the report file."
     },
     {
       "datasource": {
@@ -91,42 +131,50 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "fixedColor": "red",
-            "mode": "continuous-reds"
+            "mode": "fixed",
+            "fixedColor": "#8bbede"
           },
-          "mappings": [],
-          "max": 100,
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "Not measured",
+                  "color": "#94a3b8"
+                }
+              }
+            }
+          ],
           "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "#8bbede",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           },
           "unit": "percent",
-          "unitScale": true
+          "unitScale": true,
+          "decimals": 1,
+          "noValue": "Not measured"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 6,
-        "w": 6,
-        "x": 6,
-        "y": 0
+        "x": 4,
+        "y": 4,
+        "w": 4,
+        "h": 5
       },
       "id": 2,
       "options": {
         "colorMode": "value",
         "graphMode": "none",
         "justifyMode": "center",
-        "orientation": "auto",
+        "orientation": "horizontal",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -136,56 +184,161 @@
         },
         "showPercentChange": false,
         "textMode": "value",
-        "wideLayout": true
+        "wideLayout": false,
+        "text": {
+          "valueSize": 48,
+          "titleSize": 12
+        }
       },
       "pluginVersion": "10.3.3",
       "targets": [
         {
           "expr": "gremlin_success_rate_percent",
           "instant": true,
-          "refId": "A"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "legendFormat": "Pass rate"
         }
       ],
-      "title": "Success Rate",
-      "transparent": true,
-      "type": "stat"
+      "title": "Recorded pass rate",
+      "transparent": false,
+      "type": "stat",
+      "description": "Percentage of saved reports marked successful. Historical flags may not include recovery verification; compare Verified recovery."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#8bbede"
+          },
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "Not measured",
+                  "color": "#94a3b8"
+                }
+              }
+            }
+          ],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#8bbede",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percent",
+          "unitScale": true,
+          "decimals": 1,
+          "noValue": "Not measured"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 4,
+        "w": 4,
+        "h": 5
+      },
+      "id": 15,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": false,
+        "text": {
+          "valueSize": 48,
+          "titleSize": 12
+        }
+      },
+      "pluginVersion": "10.3.3",
+      "targets": [
+        {
+          "expr": "gremlin_recovery_coverage_percent",
+          "instant": true,
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "legendFormat": "Verified recovery"
+        }
+      ],
+      "title": "Verified recovery",
+      "transparent": false,
+      "type": "stat",
+      "description": "Share of all saved reports with an actual health-check recovery measurement. This is evidence coverage, not application uptime."
     },
     {
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "mode": "fixed",
+            "fixedColor": "#8bbede"
           },
-          "mappings": [],
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "Not measured",
+                  "color": "#94a3b8"
+                }
+              }
+            }
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "#8bbede",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
               }
             ]
           },
-          "unitScale": true
+          "unitScale": true,
+          "decimals": 0,
+          "noValue": "Not measured"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 6,
-        "w": 6,
         "x": 12,
-        "y": 0
+        "y": 4,
+        "w": 4,
+        "h": 5
       },
       "id": 3,
       "options": {
         "colorMode": "value",
         "graphMode": "none",
         "justifyMode": "center",
-        "orientation": "auto",
+        "orientation": "horizontal",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -195,18 +348,33 @@
         },
         "showPercentChange": false,
         "textMode": "value",
-        "wideLayout": true
+        "wideLayout": false,
+        "text": {
+          "valueSize": 48,
+          "titleSize": 12
+        }
       },
       "pluginVersion": "10.3.3",
       "targets": [
         {
-          "expr": "gremlin_attacks_failed_total",
+          "expr": "gremlin_recovery_unverified_total",
           "instant": true,
-          "refId": "A"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "legendFormat": "Unverified recovery"
         }
       ],
-      "title": "Failed Attacks",
-      "type": "stat"
+      "title": "Unverified recovery",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "transparent": false,
+      "description": "Reports with no verified recovery measurement, including failed checks, explicitly skipped checks, and ambiguous legacy data."
     },
     {
       "datasource": {
@@ -216,38 +384,47 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "fixedColor": "transparent",
-            "mode": "fixed"
+            "mode": "fixed",
+            "fixedColor": "#8bbede"
           },
           "fieldMinMax": false,
-          "mappings": [],
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "Not measured",
+                  "color": "#94a3b8"
+                }
+              }
+            }
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "#8bbede",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           },
           "unit": "ms",
-          "unitScale": true
+          "unitScale": true,
+          "decimals": 0,
+          "noValue": "Not measured"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 6,
-        "w": 6,
-        "x": 18,
-        "y": 0
+        "x": 16,
+        "y": 4,
+        "w": 4,
+        "h": 5
       },
       "id": 4,
       "options": {
-        "colorMode": "background",
+        "colorMode": "value",
         "graphMode": "none",
         "justifyMode": "center",
         "orientation": "horizontal",
@@ -260,223 +437,95 @@
         },
         "showPercentChange": false,
         "textMode": "value",
-        "wideLayout": true
+        "wideLayout": false,
+        "text": {
+          "valueSize": 48,
+          "titleSize": 12
+        }
       },
       "pluginVersion": "10.3.3",
       "targets": [
         {
           "expr": "gremlin_last_recovery_ms",
           "instant": true,
-          "refId": "A"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "legendFormat": "Latest recovery"
         }
       ],
-      "title": "Last Recovery Time (ms)",
-      "type": "stat"
+      "title": "Latest recovery",
+      "type": "stat",
+      "transparent": false,
+      "description": "Measured recovery of the most recent report by start timestamp. Unverified, skipped, or ambiguous measurements appear as Not measured."
     },
     {
+      "id": 11,
+      "type": "stat",
+      "title": "Exporter",
+      "description": "Prometheus scrape status. A live exporter confirms report delivery, not application health.",
+      "gridPos": {
+        "x": 20,
+        "y": 4,
+        "w": 4,
+        "h": 5
+      },
       "datasource": {
         "type": "prometheus",
         "uid": "PBFA97CFB590B2093"
       },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "continuous-YlRd"
-          },
-          "custom": {
-            "fillOpacity": 27,
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineWidth": 1
-          },
-          "fieldMinMax": true,
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unitScale": true
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 6
-      },
-      "id": 5,
-      "options": {
-        "colWidth": 0.9,
-        "legend": {
-          "displayMode": "list",
-          "placement": "right",
-          "showLegend": true
-        },
-        "rowHeight": 0.9,
-        "showValue": "auto",
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "10.3.3",
       "targets": [
         {
-          "expr": "gremlin_attacks_by_type_total",
+          "expr": "up{job=\"gremlin\"}",
           "instant": true,
-          "legendFormat": "{{attack}}",
-          "refId": "A"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "legendFormat": "Metrics"
         }
       ],
-      "title": "Attacks by Type",
-      "transparent": true,
-      "type": "status-history"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
       "fieldConfig": {
         "defaults": {
-          "color": {
-            "fixedColor": "light-blue",
-            "mode": "fixed"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "fillOpacity": 16,
-            "gradientMode": "opacity",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineWidth": 1,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
+          "noValue": "Not measured",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Offline",
+                  "color": "#e6b47d"
+                },
+                "1": {
+                  "text": "Live",
+                  "color": "#7acdb5"
+                }
+              }
             }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "ms",
-          "unitScale": true
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 6
-      },
-      "id": 6,
-      "options": {
-        "barRadius": 0.3,
-        "barWidth": 0.76,
-        "fullHighlight": true,
-        "groupWidth": 0.69,
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "orientation": "horizontal",
-        "showValue": "auto",
-        "stacking": "none",
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        },
-        "xTickLabelRotation": 0,
-        "xTickLabelSpacing": 0
-      },
-      "targets": [
-        {
-          "expr": "gremlin_avg_recovery_ms_by_type",
-          "instant": true,
-          "legendFormat": "{{attack}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Avg Recovery Time by Attack Type (ms)",
-      "type": "barchart"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "fieldConfig": {
-        "defaults": {
+          ],
           "color": {
-            "mode": "continuous-reds"
+            "mode": "fixed",
+            "fixedColor": "#8bbede"
           },
-          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "#8bbede",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           },
-          "unitScale": true
+          "decimals": 0
         },
         "overrides": []
       },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 14
-      },
-      "id": 7,
       "options": {
-        "displayMode": "lcd",
-        "maxVizHeight": 300,
-        "minVizHeight": 16,
-        "minVizWidth": 8,
-        "namePlacement": "auto",
-        "orientation": "horizontal",
+        "colorMode": "value",
+        "graphMode": "none",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -484,111 +533,28 @@
           "fields": "",
           "values": false
         },
-        "showUnfilled": true,
-        "sizing": "auto",
-        "valueMode": "color"
-      },
-      "pluginVersion": "10.3.3",
-      "targets": [
-        {
-          "expr": "gremlin_avg_duration_ms_by_type",
-          "instant": true,
-          "legendFormat": "{{attack}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Avg Attack Duration by Type (ms)",
-      "transparent": true,
-      "type": "bargauge"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "fixedColor": "semi-dark-purple",
-            "mode": "fixed"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "fillOpacity": 17,
-            "gradientMode": "hue",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineWidth": 1,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unitScale": true
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 14
-      },
-      "id": 8,
-      "options": {
-        "barRadius": 0.3,
-        "barWidth": 0.97,
-        "fullHighlight": true,
-        "groupWidth": 0.7,
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
+        "justifyMode": "center",
         "orientation": "horizontal",
-        "showValue": "auto",
-        "stacking": "none",
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        },
-        "xTickLabelRotation": 0,
-        "xTickLabelSpacing": 0
-      },
-      "targets": [
-        {
-          "expr": "gremlin_attacks_failed_by_type_total",
-          "instant": true,
-          "legendFormat": "{{attack}}",
-          "refId": "A"
+        "textMode": "value",
+        "wideLayout": false,
+        "text": {
+          "valueSize": 48,
+          "titleSize": 12
         }
-      ],
-      "title": "Failed Attacks by Type",
-      "type": "barchart"
+      }
+    },
+    {
+      "id": 12,
+      "title": "Activity & evidence",
+      "type": "row",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 24,
+        "h": 1
+      }
     },
     {
       "datasource": {
@@ -598,32 +564,31 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "fixedColor": "red",
-            "mode": "fixed"
+            "mode": "continuous-blues"
           },
           "custom": {
             "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
-            "axisLabel": "",
+            "axisLabel": "Saved tests",
             "axisPlacement": "auto",
             "barAlignment": 0,
             "drawStyle": "line",
-            "fillOpacity": 20,
-            "gradientMode": "opacity",
+            "fillOpacity": 25,
+            "gradientMode": "scheme",
             "hideFrom": {
               "legend": false,
               "tooltip": false,
               "viz": false
             },
             "insertNulls": false,
-            "lineInterpolation": "smooth",
-            "lineWidth": 1,
-            "pointSize": 5,
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2,
+            "pointSize": 4,
             "scaleDistribution": {
               "type": "linear"
             },
-            "showPoints": "never",
+            "showPoints": "auto",
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -638,63 +603,547 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "#8bbede",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           },
-          "unitScale": true
+          "unitScale": true,
+          "min": 0,
+          "decimals": 0
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 24,
         "x": 0,
-        "y": 22
+        "y": 10,
+        "w": 16,
+        "h": 8
       },
       "id": 9,
       "options": {
         "legend": {
-          "calcs": [],
-          "displayMode": "list",
+          "displayMode": "table",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": true,
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
         },
         "tooltip": {
-          "mode": "single",
-          "sort": "none"
+          "mode": "multi",
+          "sort": "desc"
         }
       },
       "targets": [
         {
-          "expr": "increase(gremlin_attacks_total[1m])",
-          "legendFormat": "attacks per minute",
-          "refId": "A"
+          "expr": "gremlin_attacks_total",
+          "legendFormat": "Saved tests",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          }
         }
       ],
-      "title": "Total Attacks Over Time",
-      "type": "timeseries"
+      "title": "Recorded activity",
+      "type": "timeseries",
+      "transparent": false,
+      "description": "Saved report count sampled by Prometheus. Activity before monitoring started is not reconstructed."
+    },
+    {
+      "id": 16,
+      "type": "bargauge",
+      "title": "Recovery evidence",
+      "description": "Measured checks versus reports without verified recovery. Counts are compared against all saved reports.",
+      "gridPos": {
+        "x": 16,
+        "y": 10,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "expr": "gremlin_recovery_verified_total",
+          "instant": true,
+          "legendFormat": "Measured",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          }
+        },
+        {
+          "expr": "gremlin_recovery_unverified_total",
+          "instant": true,
+          "legendFormat": "Unverified",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "decimals": 0,
+          "unit": "short",
+          "color": {
+            "mode": "continuous-blues"
+          },
+          "thresholds": {
+            "mode": "percentage",
+            "steps": [
+              {
+                "color": "#7acdb5",
+                "value": null
+              },
+              {
+                "color": "#8bbede",
+                "value": 50
+              },
+              {
+                "color": "#bcc5ed",
+                "value": 100
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": false,
+        "valueMode": "text",
+        "minVizHeight": 20,
+        "maxVizHeight": 48,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 13,
+      "title": "Failure types",
+      "type": "row",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "x": 0,
+        "y": 19,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-blues"
+          },
+          "fieldMinMax": false,
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "Not measured",
+                  "color": "#94a3b8"
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "percentage",
+            "steps": [
+              {
+                "color": "#7acdb5",
+                "value": null
+              },
+              {
+                "color": "#8bbede",
+                "value": 50
+              },
+              {
+                "color": "#bcc5ed",
+                "value": 100
+              }
+            ]
+          },
+          "unitScale": true,
+          "min": 0,
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "Not measured"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 12,
+        "h": 8
+      },
+      "id": 5,
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": false,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "minVizHeight": 14,
+        "maxVizHeight": 34,
+        "valueMode": "text"
+      },
+      "pluginVersion": "10.3.3",
+      "targets": [
+        {
+          "expr": "gremlin_attacks_by_type_total",
+          "instant": true,
+          "legendFormat": "{{attack}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          }
+        }
+      ],
+      "title": "Tests by failure type",
+      "transparent": false,
+      "type": "bargauge",
+      "description": "Number of tests for each simulated failure."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-blues"
+          },
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "Not measured",
+                  "color": "#94a3b8"
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "percentage",
+            "steps": [
+              {
+                "color": "#7acdb5",
+                "value": null
+              },
+              {
+                "color": "#8bbede",
+                "value": 50
+              },
+              {
+                "color": "#bcc5ed",
+                "value": 100
+              }
+            ]
+          },
+          "unit": "ms",
+          "unitScale": true,
+          "min": 0,
+          "decimals": 0,
+          "fieldMinMax": false,
+          "noValue": "Not measured"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 20,
+        "w": 12,
+        "h": 8
+      },
+      "id": 6,
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": false,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "minVizHeight": 14,
+        "maxVizHeight": 34,
+        "valueMode": "text"
+      },
+      "targets": [
+        {
+          "expr": "gremlin_avg_recovery_ms_by_type",
+          "instant": true,
+          "legendFormat": "{{attack}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          }
+        }
+      ],
+      "title": "Average recovery by failure type",
+      "type": "bargauge",
+      "transparent": false,
+      "description": "Mean of verified recovery measurements only. Skipped, failed, and ambiguous legacy checks are excluded. Not measured means no usable measurements for that type."
+    },
+    {
+      "id": 14,
+      "title": "Duration & recorded outcomes",
+      "type": "row",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "x": 0,
+        "y": 28,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-blues"
+          },
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "Not measured",
+                  "color": "#94a3b8"
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "percentage",
+            "steps": [
+              {
+                "color": "#7acdb5",
+                "value": null
+              },
+              {
+                "color": "#8bbede",
+                "value": 50
+              },
+              {
+                "color": "#bcc5ed",
+                "value": 100
+              }
+            ]
+          },
+          "unitScale": true,
+          "min": 0,
+          "unit": "ms",
+          "decimals": 0,
+          "fieldMinMax": false,
+          "noValue": "Not measured"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 29,
+        "w": 12,
+        "h": 8
+      },
+      "id": 7,
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": false,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "minVizHeight": 14,
+        "maxVizHeight": 34,
+        "valueMode": "text"
+      },
+      "pluginVersion": "10.3.3",
+      "targets": [
+        {
+          "expr": "gremlin_avg_duration_ms_by_type",
+          "instant": true,
+          "legendFormat": "{{attack}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          }
+        }
+      ],
+      "title": "Average test duration",
+      "transparent": false,
+      "type": "bargauge",
+      "description": "Average time spent running the fault, before recovery polling."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-YlRd"
+          },
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "Not measured",
+                  "color": "#94a3b8"
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "percentage",
+            "steps": [
+              {
+                "color": "#7acdb5",
+                "value": null
+              },
+              {
+                "color": "#8bbede",
+                "value": 50
+              },
+              {
+                "color": "#bcc5ed",
+                "value": 100
+              }
+            ]
+          },
+          "unitScale": true,
+          "min": 0,
+          "unit": "short",
+          "decimals": 0,
+          "fieldMinMax": false,
+          "noValue": "Not measured"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 29,
+        "w": 12,
+        "h": 8
+      },
+      "id": 8,
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": false,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "minVizHeight": 14,
+        "maxVizHeight": 34,
+        "valueMode": "text"
+      },
+      "targets": [
+        {
+          "expr": "gremlin_attacks_failed_by_type_total",
+          "instant": true,
+          "legendFormat": "{{attack}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          }
+        }
+      ],
+      "title": "Recorded failures",
+      "type": "bargauge",
+      "transparent": false,
+      "description": "Original unsuccessful report flags by failure type. Does not retroactively mark legacy records with unknown recovery as failed."
+    },
+    {
+      "id": 17,
+      "title": "Measurement notes",
+      "type": "text",
+      "gridPos": {
+        "x": 0,
+        "y": 38,
+        "w": 24,
+        "h": 3
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "**Pass rate** uses the result stored in each report. **Verified recovery** requires a recorded health-check measurement. Historical records with missing or ambiguous recovery evidence remain unverified.\n\nTimings show **Not measured** when evidence is unavailable. Charts update every 5 seconds; decorative animation does not indicate a healthy target."
+      },
+      "transparent": true
     }
   ],
-  "refresh": "10s",
+  "refresh": "5s",
   "schemaVersion": 39,
-  "tags": [],
+  "tags": [
+    "gremlin",
+    "resilience"
+  ],
   "templating": {
     "list": []
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-30m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Gremlin-in-a-Box - Chaos Dashboard",
+  "title": "Gremlin / Experiments",
   "uid": "eebaf189-7d05-426b-8ce7-9a18b251988d",
-  "version": 12,
-  "weekStart": ""
+  "version": 17,
+  "weekStart": "",
+  "description": "Recorded test outcomes and measured recovery evidence. Historical pass flags are preserved; unverified recovery is shown separately."
 }

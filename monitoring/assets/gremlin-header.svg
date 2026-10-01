@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 112" role="img" aria-labelledby="title desc">
+  <title id="title">Gremlin — experiment review</title>
+  <desc id="desc">A compact experiment dashboard header with a slow gradient signal accent.</desc>
+  <style>@media (prefers-reduced-motion: reduce) { .moving { display: none; } }</style>
+  <defs>
+    <linearGradient id="ink"><stop stop-color="#d6e4f4"/><stop offset="1" stop-color="#8ab8ce"/></linearGradient>
+    <linearGradient id="accent"><stop stop-color="#65c7ad"/><stop offset=".55" stop-color="#83b9db"/><stop offset="1" stop-color="#abb7ec"/></linearGradient>
+  </defs>
+  <text x="8" y="27" font-family="Arial,sans-serif" font-size="11" fill="#8b97a8" letter-spacing="2">GREMLIN / EXPERIMENTS</text>
+  <text x="6" y="68" font-family="Arial,sans-serif" font-size="31" font-weight="500" fill="url(#ink)">Service resilience</text>
+  <text x="8" y="95" font-family="Arial,sans-serif" font-size="13" fill="#8b97a8">Recorded outcomes and recovery evidence</text>
+  <path d="M1050 61h65l10-9 11 18 11-28 12 37 11-18h180" fill="none" stroke="#283541" stroke-width="1.5"/>
+  <path d="M1050 61h65l10-9 11 18 11-28 12 37 11-18h180" fill="none" class="moving" stroke="url(#accent)" stroke-width="1.5" stroke-dasharray="50 380">
+    <animate attributeName="stroke-dashoffset" from="430" to="0" dur="12s" repeatCount="indefinite"/>
+  </path>
+</svg>

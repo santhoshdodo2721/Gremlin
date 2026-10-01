@@ -1,0 +1,66 @@
+/* Scoped to the Gremlin dashboard; Grafana navigation and other dashboards stay native. */
+body:has(img[src*="gremlin-header.svg"]) {
+  --gremlin-gradient: linear-gradient(110deg, #7acdb5 4%, #8bbede 48%, #bcc5ed 90%);
+  --gremlin-warm-gradient: linear-gradient(110deg, #e6b47d, #dc8c85, #caa4bd);
+}
+body:has(img[src*="gremlin-header.svg"]) [data-panelid] [class*="panel-container"] {
+  border-radius: 9px;
+  border-color: rgba(149, 171, 192, .14);
+  background: linear-gradient(155deg, #1b2229 0%, #171c23 72%);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, .08);
+  overflow: hidden;
+  animation: gremlin-enter 480ms ease-out both;
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+body:has(img[src*="gremlin-header.svg"]) [data-panelid] [class*="panel-container"]:hover {
+  border-color: rgba(149, 171, 192, .35);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, .12);
+}
+body:has(img[src*="gremlin-header.svg"]) [data-panelid="10"] [class*="panel-container"] {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+body:has(img[src*="gremlin-header.svg"]) :is([data-panelid="1"], [data-panelid="2"], [data-panelid="3"], [data-panelid="4"], [data-panelid="11"], [data-panelid="15"]) [class*="panel-container"] div > span {
+  background-image: var(--gremlin-gradient);
+  background-size: 180% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: gremlin-ink 16s ease-in-out infinite alternate;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.025em;
+}
+body:has(img[src*="gremlin-header.svg"]) [data-panelid="3"] [class*="panel-container"] div > span {
+  background-image: var(--gremlin-warm-gradient);
+}
+body:has(img[src*="gremlin-header.svg"]) [data-testid="data-testid Bar gauge value"] {
+  background-image: var(--gremlin-gradient);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent;
+  font-variant-numeric: tabular-nums;
+  background-size: 180% 100%;
+  animation: gremlin-ink 16s ease-in-out infinite alternate;
+}
+body:has(img[src*="gremlin-header.svg"]) [data-panelid="8"] [data-testid="data-testid Bar gauge value"] {
+  background-image: var(--gremlin-warm-gradient);
+}
+@keyframes gremlin-enter {
+  from { opacity: .25; }
+  to { opacity: 1; }
+}
+@keyframes gremlin-ink {
+  from { background-position: 0% 50%; }
+  to { background-position: 100% 50%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body:has(img[src*="gremlin-header.svg"]) [data-panelid] [class*="panel-container"],
+  body:has(img[src*="gremlin-header.svg"]) [class*="panel-container"] div > span,
+  body:has(img[src*="gremlin-header.svg"]) [data-testid="data-testid Bar gauge value"] {
+    animation: none;
+    transition: none;
+  }
+}

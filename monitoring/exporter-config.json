@@ -1,0 +1,4 @@
+{
+  "reports_file": "/data/gremlin-reports.json",
+  "metrics_addr": ":9090"
+}
