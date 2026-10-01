@@ -61,7 +61,7 @@ func Banner() {
 		fmt.Println("  " + line)
 	}
 	fmt.Println(bannerReset)
-	fmt.Println("  " + bannerColor + "ResilenceOps" + bannerReset + Gray + "  /  APPLICATION RESILIENCE CONSOLE  /  v0.2" + Reset)
+	fmt.Println("  " + bannerColor + "ResilenceOps" + bannerReset + Gray + "  /  APPLICATION RESILIENCE CONSOLE  /  v0.1.0" + Reset)
 	fmt.Println()
 }
 

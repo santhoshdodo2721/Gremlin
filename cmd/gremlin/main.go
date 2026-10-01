@@ -62,7 +62,7 @@ func main() {
 		}
 
 	case "version":
-		fmt.Println("ResilenceOps v0.2.0")
+		fmt.Println("ResilenceOps v0.1.0")
 
 	case "status":
 		fmt.Println("Registered attack plugins:")
