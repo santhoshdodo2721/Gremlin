@@ -1,6 +1,6 @@
 # Compiled binary
-bin/
-gremlin
+/bin/
+/gremlin
 
 # Local attack history (generated at runtime, not source)
 gremlin-reports.json
@@ -16,3 +16,10 @@ load-test-result.json
 
 # Docker volumes if any get created locally
 monitoring/data/
+
+# Retired CLI build
+/resilentops
+
+/resiletops
+/aut/microservices-demo/
+/.retired-bin/

@@ -2,9 +2,13 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
+	"os"
 	"strings"
+	"text/tabwriter"
 	"time"
 
 	"gremlin-in-a-box/internal/config"
@@ -26,46 +30,106 @@ func runInteractiveMenu(cfg config.Config, docker *dockerapi.Client, ctrl *contr
 	for {
 		tui.Clear()
 		tui.Banner()
-		printReminders(cfg, metricsRunning)
-
-		choice := tui.Menu("Main Menu", []string{
-			"🚀 Step-by-Step Guided Attack Wizard (Recommended for beginners)",
-			"⚡ Quick Attack (Select attack plugin directly)",
-			"📊 Check system status (Docker / containers / dashboard)",
-			"📈 Find resilience breaking point (Auto-escalating threshold test)",
-			"👥 Run a load test (Find max concurrent users)",
-			"🧪 Run the FULL test suite (Attacks + threshold + load test)",
-			"📜 View attack report history",
-			"📉 View resilience history",
-			"🔌 Show registered attack plugins",
-			"📡 Start metrics server in the background (for Grafana/Prometheus)",
+		printApplicationWorkspace(cfg, docker)
+		choice := tui.MainMenu([]string{
+			"Guided experiment",
+			"Continuous testing",
+			"Results & history",
+			"Application status",
+			"Advanced tools",
+			"View running services",
 		})
-
 		switch choice {
 		case 0:
-			// Auto-start metrics server so Grafana immediately receives telemetry
-			if !metricsRunning {
-				metricsRunning = true
-				go m.Serve(cfg.MetricsAddr)
-			}
 			runGuidedWizard(docker, ctrl, cfg)
 		case 1:
-			attackMenu(docker, ctrl, cfg)
+			continuousMenu(docker, ctrl, cfg)
 		case 2:
-			checkSystemStatus(cfg, docker)
+			resultsMenu(store)
 		case 3:
-			thresholdMenu(docker, cfg)
+			checkSystemStatus(cfg, docker)
 		case 4:
-			loadtestMenu(docker, cfg)
+			advancedMenu(cfg, docker, ctrl, m)
 		case 5:
-			runFullSuite(docker, ctrl, cfg)
-		case 6:
+			viewRunningServices(cfg, docker)
+		default:
+			return
+		}
+	}
+}
+
+func viewRunningServices(cfg config.Config, docker *dockerapi.Client) {
+	tui.Clear()
+	tui.Banner()
+	fmt.Println(tui.Bold + tui.Red + "  RUNNING APPLICATION SERVICES" + tui.Reset)
+	fmt.Println(tui.Gray + "  " + cfg.ApplicationDirectory + tui.Reset)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	containers, err := docker.ListApplicationContainers(ctx, cfg.ApplicationDirectory)
+	if err != nil {
+		tui.Warning("Could not load running services: " + err.Error())
+	} else if len(containers) == 0 {
+		tui.Info("No application services are running.")
+	} else {
+		fmt.Printf("\n  %d running services\n\n", len(containers))
+		table := tabwriter.NewWriter(os.Stdout, 0, 4, 3, ' ', 0)
+		fmt.Fprintln(table, "  SERVICE\tCONTAINER\tSTATUS")
+		for _, container := range containers {
+			service := container.Labels["com.docker.compose.service"]
+			if service == "" {
+				service = "—"
+			}
+			fmt.Fprintf(table, "  %s\t%s\t%s\n", service, container.DisplayName(), container.Status)
+		}
+		table.Flush()
+	}
+	fmt.Println()
+	tui.Pause()
+}
+
+func resultsMenu(store *reports.Store) {
+	for {
+		tui.Clear()
+		tui.Banner()
+		choice := tui.Menu("View results", []string{
+			"Test history",
+			"Resilience history",
+		})
+		switch choice {
+		case 0:
 			viewReports(store)
-		case 7:
+		case 1:
 			viewResilienceHistory()
-		case 8:
+		default:
+			return
+		}
+	}
+}
+
+func advancedMenu(cfg config.Config, docker *dockerapi.Client, ctrl *controller.Controller, m *metrics.Collector) {
+	for {
+		tui.Clear()
+		tui.Banner()
+		choice := tui.Menu("Advanced tools", []string{
+			"Custom test",
+			"Service limits",
+			"Load test",
+			"Full test suite",
+			"Attack types",
+			"Local metrics server",
+		})
+		switch choice {
+		case 0:
+			attackMenu(docker, ctrl, cfg)
+		case 1:
+			thresholdMenu(docker, cfg)
+		case 2:
+			loadtestMenu(docker, cfg)
+		case 3:
+			runFullSuite(docker, ctrl, cfg)
+		case 4:
 			viewPlugins()
-		case 9:
+		case 5:
 			startMetricsBackground(cfg, m)
 		default:
 			return
@@ -73,35 +137,25 @@ func runInteractiveMenu(cfg config.Config, docker *dockerapi.Client, ctrl *contr
 	}
 }
 
-func printReminders(cfg config.Config, metricsOn bool) {
-	fmt.Println(tui.Gray + "  universal chaos engineering: attacks any Docker container" + tui.Reset)
-	if metricsOn {
-		fmt.Println(tui.Green + "  metrics server: running in background on " + cfg.MetricsAddr + tui.Reset)
-	} else {
-		fmt.Println(tui.Yellow + "  metrics server: not started yet (option 10 starts it, or start guided wizard)" + tui.Reset)
-	}
-	fmt.Println(tui.Gray + "  dashboard: http://localhost:3001  (Grafana, once monitoring stack is up)" + tui.Reset)
-	fmt.Println()
-}
-
 // runGuidedWizard walks a user through a chaos attack step-by-step
 // with plain-language explanations, safe presets, and pre-flight checks.
 func runGuidedWizard(docker *dockerapi.Client, ctrl *controller.Controller, cfg config.Config) {
 	tui.Clear()
-	fmt.Println(tui.Bold + tui.Red + "  🚀 STEP-BY-STEP GUIDED CHAOS WIZARD" + tui.Reset)
-	fmt.Println(tui.Gray + "  Test the resilience of any Docker container without prior chaos experience" + tui.Reset)
+	tui.Banner()
+	fmt.Println(tui.Bold + tui.Red + "  GUIDED EXPERIMENT" + tui.Reset)
+	fmt.Println(tui.Gray + "  Choose an application service, a failure, and a recovery check." + tui.Reset)
 
 	// STEP 1: Discover & Select Target Container
 	tui.StepHeader(1, 4, "Choose Target Container")
-	tui.Info("Scanning your local Docker daemon for running containers...")
-	containers, err := docker.ListContainers(context.Background())
+	tui.Info("Discovering running services in this application...")
+	containers, err := docker.ListApplicationContainers(context.Background(), cfg.ApplicationDirectory)
 	if err != nil {
 		fmt.Println(tui.Red + "Error listing containers: " + err.Error() + tui.Reset)
 		tui.Pause()
 		return
 	}
 	if len(containers) == 0 {
-		tui.Warning("No running Docker containers detected. Start your container or application first!")
+		tui.Warning("No application containers are running. Start them with: docker compose -f aut/microservices-demo/deploy/docker-compose/docker-compose.yml up -d")
 		tui.Pause()
 		return
 	}
@@ -109,40 +163,38 @@ func runGuidedWizard(docker *dockerapi.Client, ctrl *controller.Controller, cfg 
 	var containerNames []string
 	var menuItems []string
 	for _, c := range containers {
-		name := c.ID[:12]
+		name := c.ID
+		if len(name) > 12 {
+			name = name[:12]
+		}
 		if len(c.Names) > 0 {
 			name = strings.TrimPrefix(c.Names[0], "/")
 		}
 		containerNames = append(containerNames, name)
 		menuItems = append(menuItems, fmt.Sprintf("%-28s [%s]", name, c.Image))
 	}
-	menuItems = append(menuItems, "Enter custom container name or ID manually...")
 
 	cChoice := tui.Menu("Which container would you like to test?", menuItems)
 	if cChoice < 0 {
 		return
 	}
 
-	var target string
-	if cChoice < len(containerNames) {
-		target = containerNames[cChoice]
-	} else {
-		target = tui.AskDefault("Container name or ID", "aut-api")
-	}
+	target := containerNames[cChoice]
 	tui.Success("Target container selected: " + target)
 
 	// STEP 2: Choose Failure Scenario (in Plain English)
 	tui.Clear()
+	tui.Banner()
 	tui.StepHeader(2, 4, "Choose Failure Scenario")
 	tui.Info("Select what real-world failure condition you want to simulate against " + target + ":")
 
 	scenarios := []string{
-		"🐢 Network Lag / Congestion   (Simulate slow cross-region/cloud latency)",
-		"📉 Network Packet Loss         (Simulate unstable connection / dropped packets)",
-		"⚡ CPU Starvation             (Simulate runaway loop / noisy neighbor CPU spike)",
-		"⏸️  Service Freeze / Hang       (Simulate thread deadlock / GC freeze)",
-		"💥 Hard Crash & Restart        (Simulate container crash / OOM killer)",
-		"🔀 Packet Corruption          (Simulate faulty network interface / bad data)",
+		"Network latency       Slow the service connection",
+		"Packet loss           Drop a percentage of traffic",
+		"CPU throttling        Limit available processing capacity",
+		"Service freeze        Pause the application container",
+		"Crash and restart     Stop and restart the service",
+		"Packet corruption     Damage a percentage of traffic",
 	}
 
 	sChoice := tui.Menu("Choose a failure scenario to inject", scenarios)
@@ -176,14 +228,15 @@ func runGuidedWizard(docker *dockerapi.Client, ctrl *controller.Controller, cfg 
 
 	// STEP 3: Choose Attack Intensity Presets
 	tui.Clear()
+	tui.Banner()
 	tui.StepHeader(3, 4, "Choose Attack Intensity")
 	tui.Info("Beginner presets provide safe, predictable chaos tests:")
 
 	intensities := []string{
-		"🟢 Mild     (Gentle test: quick duration, moderate stress)",
-		"🟡 Moderate (Realistic test: typical production incident level)",
-		"🔴 Heavy    (High stress: pushes service near its capacity limit)",
-		"⚙️  Custom   (Manually specify exact delay, percentage, or duration)",
+		"Mild         Short duration, lower intensity",
+		"Moderate     Longer duration, medium intensity",
+		"Heavy        Longer duration, higher intensity",
+		"Custom       Configure intensity and duration",
 	}
 
 	iChoice := tui.Menu("Choose intensity level", intensities)
@@ -303,16 +356,14 @@ func runGuidedWizard(docker *dockerapi.Client, ctrl *controller.Controller, cfg 
 
 	// STEP 4: Recovery Verification (Health Check)
 	tui.Clear()
+	tui.Banner()
 	tui.StepHeader(4, 4, "Recovery Verification")
 	tui.Info("How should Gremlin verify that your service has recovered after the attack?")
 
-	suggestedHealth := "http://localhost:80/"
-	if strings.Contains(target, "aut-api") {
-		suggestedHealth = "http://localhost:8080/health"
-	}
+	suggestedHealth := cfg.TargetHealthURL
 
 	hOptions := []string{
-		fmt.Sprintf("Use auto-detected endpoint (%s)", suggestedHealth),
+		fmt.Sprintf("Use suggested endpoint (%s)", suggestedHealth),
 		"Specify a custom URL",
 		"Skip recovery check (run attack only)",
 	}
@@ -323,17 +374,18 @@ func runGuidedWizard(docker *dockerapi.Client, ctrl *controller.Controller, cfg 
 	case 0:
 		healthURL = suggestedHealth
 	case 1:
-		healthURL = tui.AskDefault("Enter URL to check", "http://localhost:80/")
+		healthURL = tui.AskDefault("Enter URL to check", cfg.TargetHealthURL)
 	case 2:
 		healthURL = ""
 	default:
-		healthURL = suggestedHealth
+		return
 	}
 
 	// PRE-FLIGHT VERIFICATION
 	tui.Clear()
+	tui.Banner()
 	fmt.Println(tui.Bold + "================================================================" + tui.Reset)
-	fmt.Println(tui.Bold + tui.Cyan + "                   PRE-FLIGHT TEST SUMMARY" + tui.Reset)
+	fmt.Println(tui.Bold + tui.Red + "                   PRE-FLIGHT TEST SUMMARY" + tui.Reset)
 	fmt.Println(tui.Bold + "================================================================" + tui.Reset)
 	fmt.Printf("  • Target Container : %s%s%s\n", tui.Bold, target, tui.Reset)
 	fmt.Printf("  • Failure Scenario : %s%s%s\n", tui.Bold, attackTitle, tui.Reset)
@@ -342,6 +394,9 @@ func runGuidedWizard(docker *dockerapi.Client, ctrl *controller.Controller, cfg 
 		fmt.Printf("  • Recovery URL     : %s\n", healthURL)
 		client := http.Client{Timeout: 2 * time.Second}
 		resp, err := client.Get(healthURL)
+		if resp != nil {
+			defer resp.Body.Close()
+		}
 		if err == nil && resp.StatusCode == http.StatusOK {
 			resp.Body.Close()
 			tui.Success("Pre-flight check passed: Endpoint is responsive!")
@@ -375,6 +430,7 @@ func runGuidedWizard(docker *dockerapi.Client, ctrl *controller.Controller, cfg 
 
 	// REPORT / DIAGNOSIS
 	tui.Clear()
+	tui.Banner()
 	if attackErr != nil {
 		fmt.Println(tui.Bold + tui.Red + "================================================================" + tui.Reset)
 		fmt.Println(tui.Bold + tui.Red + "                  CHAOS TEST RESULT: FAILED" + tui.Reset)
@@ -397,70 +453,66 @@ func runGuidedWizard(docker *dockerapi.Client, ctrl *controller.Controller, cfg 
 		fmt.Println()
 		fmt.Println(tui.Bold + "  What this means for your application:" + tui.Reset)
 		fmt.Println("  ✓ Gremlin successfully stressed this container and fully reverted the state.")
-		fmt.Println("  ✓ The target container is running normally.")
+		if healthURL != "" {
+			fmt.Println("  ✓ The health endpoint returned HTTP 200 after the test.")
+		}
 		fmt.Println()
-		fmt.Println(tui.Cyan + "  📈 View real-time graphs in Grafana: http://localhost:3001" + tui.Reset)
-		fmt.Println(tui.Gray + "  (Attack telemetry has been recorded to Prometheus & Grafana)" + tui.Reset)
+		fmt.Println(tui.Red + "  📈 View real-time graphs in Grafana: http://localhost:3001" + tui.Reset)
+		fmt.Println(tui.Gray + "  Reports saved locally; monitoring requires a running exporter and monitoring stack." + tui.Reset)
 	}
 	fmt.Println(tui.Bold + "================================================================" + tui.Reset)
 	tui.Pause()
 }
 
-func selectTargetAndHealth(docker *dockerapi.Client, defaultHealth string) (string, string) {
-	containers, err := docker.ListContainers(context.Background())
-	var options []string
-	var targets []string
-	if err == nil && len(containers) > 0 {
-		for _, c := range containers {
-			name := c.ID[:12]
-			if len(c.Names) > 0 {
-				name = strings.TrimPrefix(c.Names[0], "/")
-			}
-			targets = append(targets, name)
-			options = append(options, fmt.Sprintf("%-28s [%s]", name, c.Image))
-		}
-		options = append(options, "Type container name manually...")
-		choice := tui.Menu("Select Target Container", options)
-		var target string
-		if choice >= 0 && choice < len(targets) {
-			target = targets[choice]
-		} else if choice == len(targets) {
-			target = tui.AskDefault("Target container name or ID", "aut-api")
-		} else {
-			target = "aut-api"
-		}
-
-		suggestedHealth := defaultHealth
-		if strings.Contains(target, "front-end") || strings.Contains(target, "edge-router") {
-			suggestedHealth = "http://localhost:80/"
-		} else if strings.Contains(target, "aut-api") {
-			suggestedHealth = "http://localhost:8080/health"
-		}
-		healthURL := tui.AskDefault("Health URL to verify recovery (leave empty to skip)", suggestedHealth)
-		return target, healthURL
+func selectTargetAndHealth(docker *dockerapi.Client, cfg config.Config) (string, string) {
+	containers, err := docker.ListApplicationContainers(context.Background(), cfg.ApplicationDirectory)
+	if err != nil {
+		tui.Warning("Cannot read application containers: " + err.Error())
+		tui.Pause()
+		return "", ""
 	}
-
-	target := tui.AskDefault("Target container", "aut-api")
-	healthURL := tui.AskDefault("Health URL to verify recovery (leave empty to skip)", defaultHealth)
+	if len(containers) == 0 {
+		tui.Warning("No application containers are running.")
+		tui.Info("Start application services: docker compose -f aut/microservices-demo/deploy/docker-compose/docker-compose.yml up -d")
+		tui.Pause()
+		return "", ""
+	}
+	options := make([]string, len(containers))
+	for i, c := range containers {
+		options[i] = fmt.Sprintf("%-20s %s", c.DisplayName(), c.Labels["com.docker.compose.service"])
+	}
+	choice := tui.Menu("Application services", options)
+	if choice < 0 {
+		return "", ""
+	}
+	target := containers[choice].DisplayName()
+	healthURL := tui.AskDefault("Recovery endpoint (type skip to disable)", cfg.TargetHealthURL)
+	if strings.EqualFold(healthURL, "skip") {
+		healthURL = ""
+	}
 	return target, healthURL
 }
 
 func checkSystemStatus(cfg config.Config, docker *dockerapi.Client) {
 	tui.Clear()
+	tui.Banner()
 	fmt.Println(tui.Bold + "System status" + tui.Reset)
 	fmt.Println()
 
 	client := http.Client{Timeout: 3 * time.Second}
 
-	fmt.Print("Docker daemon (/var/run/docker.sock)... ")
-	containers, err := docker.ListContainers(context.Background())
+	fmt.Print("Docker daemon (" + cfg.DockerSocket + ")... ")
+	containers, err := docker.ListApplicationContainers(context.Background(), cfg.ApplicationDirectory)
 	if err != nil {
 		fmt.Println(tui.Red + "UNREACHABLE" + tui.Reset)
 		fmt.Printf("  error: %v\n", err)
 	} else {
-		fmt.Printf("%sOK%s (%d running containers detected)\n", tui.Green, tui.Reset, len(containers))
+		fmt.Printf("%sOK%s (%d application services running)\n", tui.Green, tui.Reset, len(containers))
 		for _, c := range containers {
-			name := c.ID[:12]
+			name := c.ID
+			if len(name) > 12 {
+				name = name[:12]
+			}
 			if len(c.Names) > 0 {
 				name = strings.TrimPrefix(c.Names[0], "/")
 			}
@@ -472,6 +524,9 @@ func checkSystemStatus(cfg config.Config, docker *dockerapi.Client) {
 	if cfg.TargetHealthURL != "" {
 		fmt.Print("configured health URL (" + cfg.TargetHealthURL + ")... ")
 		resp, err := client.Get(cfg.TargetHealthURL)
+		if resp != nil {
+			defer resp.Body.Close()
+		}
 		if err != nil || resp.StatusCode != http.StatusOK {
 			fmt.Println(tui.Yellow + "NOT REACHABLE" + tui.Reset)
 			fmt.Println(tui.Gray + "  (normal if testing an external app - specify your app's health URL during attack)" + tui.Reset)
@@ -501,54 +556,66 @@ func checkSystemStatus(cfg config.Config, docker *dockerapi.Client) {
 		resp3.Body.Close()
 	}
 
-	if !metricsRunning {
-		fmt.Println()
-		fmt.Println(tui.Yellow + "note: metrics server is not running from this menu yet - Prometheus" + tui.Reset)
-		fmt.Println(tui.Yellow + "has nothing to scrape until you start it (option 10)." + tui.Reset)
-	}
+	fmt.Println()
+	checkMetricsConnection(client)
 
 	tui.Pause()
 }
 
 func runFullSuite(docker *dockerapi.Client, ctrl *controller.Controller, cfg config.Config) {
 	tui.Clear()
+	tui.Banner()
 	fmt.Println(tui.Bold + "Running the full test suite" + tui.Reset)
 	fmt.Println()
 
-	target, healthURL := selectTargetAndHealth(docker, cfg.TargetHealthURL)
+	target, healthURL := selectTargetAndHealth(docker, cfg)
+	if target == "" {
+		return
+	}
 	fmt.Println()
+	failures := 0
+	run := func(label string, work func() error) {
+		if err := tui.Spin(label, work); err != nil {
+			failures++
+		}
+	}
 
-	tui.Spin("container-pause attack (10s)", func() error {
+	run("container-pause attack (10s)", func() error {
 		return ctrl.RunAttackWithHealthURL(context.Background(), "container-pause", target, plugins.Params{"duration_s": "10"}, healthURL)
 	})
 
-	tui.Spin("latency attack (300ms, 15s)", func() error {
+	run("latency attack (300ms, 15s)", func() error {
 		return ctrl.RunAttackWithHealthURL(context.Background(), "latency", target, plugins.Params{
 			"delay_ms": "300", "jitter_ms": "20", "duration_s": "15",
 		}, healthURL)
 	})
 
-	tui.Spin("cpu attack (cgroup throttle, 15s)", func() error {
+	run("cpu attack (cgroup throttle, 15s)", func() error {
 		return ctrl.RunAttackWithHealthURL(context.Background(), "cpu", target, plugins.Params{
 			"quota_pct": "10", "duration_s": "15",
 		}, healthURL)
 	})
 
 	var latResult threshold.Result
-	tui.Spin("resilience threshold test (latency)", func() error {
-		net := network.NewManager(docker, "eth0")
-		var err error
-		latResult, err = threshold.RunLatencyThreshold(context.Background(), net, target, healthURL)
-		return err
-	})
-	if latResult.BreakingPoint > 0 {
-		hist := resilience.NewHistory("resilience-history.json")
-		hist.Append("interactive-full-suite", []threshold.Result{latResult})
+	if healthURL != "" {
+		run("resilience threshold test (latency)", func() error {
+			net := network.NewManager(docker, "eth0")
+			var err error
+			latResult, err = threshold.RunLatencyThreshold(context.Background(), net, target, healthURL)
+			return err
+		})
+		if latResult.BreakingPoint > 0 {
+			hist := resilience.NewHistory("resilience-history.json")
+			hist.Append("interactive-full-suite", []threshold.Result{latResult})
+		}
+
+	} else {
+		tui.Warning("Threshold test skipped: a health URL is required.")
 	}
 
 	var loadResult loadtest.Result
 	if healthURL != "" {
-		tui.Spin("load test (concurrent users)", func() error {
+		run("load test (concurrent users)", func() error {
 			var err error
 			loadResult, err = loadtest.Run(context.Background(), docker, target, healthURL)
 			return err
@@ -556,7 +623,11 @@ func runFullSuite(docker *dockerapi.Client, ctrl *controller.Controller, cfg con
 	}
 
 	fmt.Println()
-	fmt.Println(tui.Bold + tui.Green + "Full suite complete." + tui.Reset)
+	if failures > 0 {
+		tui.Warning(fmt.Sprintf("Suite finished with %d failed checks. Review the errors above.", failures))
+	} else {
+		tui.Success("All executed checks passed.")
+	}
 	fmt.Println()
 	fmt.Println(tui.Bold + "Summary:" + tui.Reset)
 	fmt.Printf("  latency breaking point:     %d ms\n", latResult.BreakingPoint)
@@ -566,20 +637,24 @@ func runFullSuite(docker *dockerapi.Client, ctrl *controller.Controller, cfg con
 		fmt.Printf("  memory usage at max load:   %.1f MB\n", loadResult.MemUsedMB)
 	}
 	fmt.Println()
-	fmt.Println(tui.Cyan + "View full results and trends in Grafana: http://localhost:3001" + tui.Reset)
+	fmt.Println(tui.Red + "View full results and trends in Grafana: http://localhost:3001" + tui.Reset)
 
 	tui.Pause()
 }
 
 func attackMenu(docker *dockerapi.Client, ctrl *controller.Controller, cfg config.Config) {
 	tui.Clear()
+	tui.Banner()
 	names := plugins.List()
 	choice := tui.Menu("Choose an attack", names)
 	if choice < 0 {
 		return
 	}
 	attackName := names[choice]
-	target, healthURL := selectTargetAndHealth(docker, cfg.TargetHealthURL)
+	target, healthURL := selectTargetAndHealth(docker, cfg)
+	if target == "" {
+		return
+	}
 
 	params := plugins.Params{}
 	switch attackName {
@@ -615,11 +690,20 @@ func attackMenu(docker *dockerapi.Client, ctrl *controller.Controller, cfg confi
 
 func thresholdMenu(docker *dockerapi.Client, cfg config.Config) {
 	tui.Clear()
+	tui.Banner()
 	choice := tui.Menu("Choose what to threshold-test", []string{"latency", "cpu"})
 	if choice < 0 {
 		return
 	}
-	target, healthURL := selectTargetAndHealth(docker, cfg.TargetHealthURL)
+	target, healthURL := selectTargetAndHealth(docker, cfg)
+	if healthURL == "" {
+		tui.Warning("Threshold tests require a health URL.")
+		tui.Pause()
+		return
+	}
+	if target == "" {
+		return
+	}
 
 	var result threshold.Result
 	var runErr error
@@ -646,7 +730,11 @@ func thresholdMenu(docker *dockerapi.Client, cfg config.Config) {
 
 func loadtestMenu(docker *dockerapi.Client, cfg config.Config) {
 	tui.Clear()
-	target, defaultHealth := selectTargetAndHealth(docker, cfg.TargetHealthURL)
+	tui.Banner()
+	target, defaultHealth := selectTargetAndHealth(docker, cfg)
+	if target == "" {
+		return
+	}
 	url := tui.AskDefault("URL to load test", defaultHealth)
 
 	var result loadtest.Result
@@ -671,6 +759,7 @@ func loadtestMenu(docker *dockerapi.Client, cfg config.Config) {
 
 func viewReports(store *reports.Store) {
 	tui.Clear()
+	tui.Banner()
 	list, err := store.List()
 	if err != nil {
 		fmt.Println(tui.Red + "error: " + err.Error() + tui.Reset)
@@ -684,6 +773,7 @@ func viewReports(store *reports.Store) {
 
 func viewResilienceHistory() {
 	tui.Clear()
+	tui.Banner()
 	hist := resilience.NewHistory("resilience-history.json")
 	regs, err := hist.CheckRegressions(20.0)
 	if err != nil {
@@ -698,32 +788,102 @@ func viewResilienceHistory() {
 
 func viewPlugins() {
 	tui.Clear()
+	tui.Banner()
 	fmt.Println(tui.Bold + "Registered attack plugins" + tui.Reset)
 	for _, name := range plugins.List() {
 		p, _ := plugins.Get(name)
-		fmt.Printf("  %s%-16s%s %s\n", tui.Cyan, name, tui.Reset, p.Describe())
+		fmt.Printf("  %s%-16s%s %s\n", tui.Red, name, tui.Reset, p.Describe())
 	}
 	tui.Pause()
 }
 
 func startMetricsBackground(cfg config.Config, m *metrics.Collector) {
 	tui.Clear()
+	tui.Banner()
 	if metricsRunning {
 		fmt.Println(tui.Yellow + "metrics server is already running on " + cfg.MetricsAddr + tui.Reset)
 		tui.Pause()
 		return
 	}
 
-	metricsRunning = true
-	go func() {
-		m.Serve(cfg.MetricsAddr)
-	}()
+	if err := launchMetrics(cfg, m); err != nil {
+		tui.Warning("Metrics server could not start: " + err.Error())
+		tui.Pause()
+		return
+	}
 
 	fmt.Println(tui.Green + "metrics server started in the background on " + cfg.MetricsAddr + tui.Reset)
 	fmt.Println(tui.Gray + "it will keep running for the rest of this session - you can use every" + tui.Reset)
 	fmt.Println(tui.Gray + "other menu option normally while it serves Prometheus in the background." + tui.Reset)
 	fmt.Println()
-	fmt.Println(tui.Cyan + "Prometheus scrape endpoint: http://localhost" + cfg.MetricsAddr + "/metrics" + tui.Reset)
-	fmt.Println(tui.Cyan + "View the dashboard at http://localhost:3001" + tui.Reset)
+	fmt.Println(tui.Red + "Prometheus scrape endpoint: http://localhost" + cfg.MetricsAddr + "/metrics" + tui.Reset)
+	fmt.Println(tui.Red + "View the dashboard at http://localhost:3001" + tui.Reset)
 	tui.Pause()
+}
+
+// Bind before reporting success so an occupied port is visible immediately.
+func launchMetrics(cfg config.Config, m *metrics.Collector) error {
+	listener, err := net.Listen("tcp", cfg.MetricsAddr)
+	if err != nil {
+		return err
+	}
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", m.Handler())
+	server := &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+	metricsRunning = true
+	go func() {
+		if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
+			fmt.Printf("\nMetrics server stopped: %v\n", err)
+		}
+	}()
+	return nil
+}
+
+func checkMetricsConnection(client http.Client) {
+	fmt.Print("Metrics reaching Prometheus... ")
+	resp, err := client.Get("http://localhost:9091/api/v1/targets")
+	if err != nil {
+		tui.Warning("Cannot reach Prometheus. Start the monitoring stack.")
+		return
+	}
+	defer resp.Body.Close()
+	var payload struct {
+		Status string `json:"status"`
+		Data   struct {
+			Targets []struct {
+				Labels    map[string]string `json:"labels"`
+				Health    string            `json:"health"`
+				LastError string            `json:"lastError"`
+			} `json:"activeTargets"`
+		} `json:"data"`
+	}
+	if resp.StatusCode != http.StatusOK || json.NewDecoder(resp.Body).Decode(&payload) != nil || payload.Status != "success" {
+		tui.Warning("Could not read metrics connection status.")
+		return
+	}
+	for _, target := range payload.Data.Targets {
+		if target.Labels["job"] != "gremlin" {
+			continue
+		}
+		if target.Health == "up" {
+			tui.Success("Connected. Grafana can read your test results.")
+			return
+		}
+		tui.Warning("Disconnected: " + target.LastError)
+		tui.Info("Restart monitoring: docker compose -f monitoring/docker-compose.yml up -d --build")
+		return
+	}
+	tui.Warning("No Gremlin metrics source configured in Prometheus.")
+}
+
+func printApplicationWorkspace(cfg config.Config, docker *dockerapi.Client) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	containers, err := docker.ListApplicationContainers(ctx, cfg.ApplicationDirectory)
+	status := fmt.Sprintf("%d services online", len(containers))
+	if err != nil {
+		status = "Docker unavailable"
+	}
+	fmt.Printf("  %sAPPLICATION%s  %-22s   %sMODE%s  interactive\n", tui.Gray, tui.Reset, status, tui.Gray, tui.Reset)
+	fmt.Println(tui.Gray + "  " + cfg.ApplicationDirectory + tui.Reset)
 }

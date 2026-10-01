@@ -44,8 +44,25 @@ func main() {
 	case "menu":
 		runInteractiveMenu(cfg, docker, ctrl, store, m)
 
+	case "help", "--help", "-h":
+		printUsage()
+
+	case "continuous":
+		runContinuousCmd(docker, ctrl, cfg)
+
+	case "targets":
+		containers, err := docker.ListApplicationContainers(context.Background(), cfg.ApplicationDirectory)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "application discovery error:", err)
+			os.Exit(1)
+		}
+		fmt.Println("APPLICATION SERVICES")
+		for _, container := range containers {
+			fmt.Printf("  %-20s %-10s %s\n", container.DisplayName(), container.Labels["com.docker.compose.service"], container.Status)
+		}
+
 	case "version":
-		fmt.Println("gremlin v0.1.0")
+		fmt.Println("ResilenceOps v0.2.0")
 
 	case "status":
 		fmt.Println("Registered attack plugins:")
@@ -176,25 +193,29 @@ func runAttackCmd(ctrl *controller.Controller, cfg config.Config) {
 		params["restart"] = *restart
 	}
 
-	if err := ctrl.RunAttackWithHealthURL(context.Background(), *attackName, *target, params, healthCheckURL); err != nil {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if err := ctrl.RunAttackWithHealthURL(ctx, *attackName, *target, params, healthCheckURL); err != nil {
 		fmt.Fprintln(os.Stderr, "attack error:", err)
 		os.Exit(1)
 	}
 }
 
 func printUsage() {
-	fmt.Println("gremlin - universal chaos engineering CLI")
+	fmt.Println("ResilenceOps - application resilience console")
 	fmt.Println("")
 	fmt.Println("Usage:")
-	fmt.Println("  gremlin                (launches interactive menu)")
-	fmt.Println("  gremlin menu")
-	fmt.Println("  gremlin version")
-	fmt.Println("  gremlin status")
-	fmt.Println("  gremlin attack --name <attack> --target <container> [--health-url <url>] [flags]")
-	fmt.Println("  gremlin report")
-	fmt.Println("  gremlin serve-metrics")
-	fmt.Println("  gremlin schedule --file schedule.json")
-	fmt.Println("  gremlin threshold --attack latency|cpu --target <container> [--health-url <url>]")
-	fmt.Println("  gremlin threshold-check")
-	fmt.Println("  gremlin loadtest --target <container> --url <http endpoint>")
+	fmt.Println("  resiletops                (launches interactive menu)")
+	fmt.Println("  resiletops menu")
+	fmt.Println("  resiletops version")
+	fmt.Println("  resiletops status")
+	fmt.Println("  resiletops targets")
+	fmt.Println("  resiletops continuous --target <application-container> [--attacks latency,cpu,container-pause] [--cycles 0]")
+	fmt.Println("  resiletops attack --name <attack> --target <container> [--health-url <url>] [flags]")
+	fmt.Println("  resiletops report")
+	fmt.Println("  resiletops serve-metrics")
+	fmt.Println("  resiletops schedule --file schedule.json")
+	fmt.Println("  resiletops threshold --attack latency|cpu --target <container> [--health-url <url>]")
+	fmt.Println("  resiletops threshold-check")
+	fmt.Println("  resiletops loadtest --target <container> --url <http endpoint>")
 }

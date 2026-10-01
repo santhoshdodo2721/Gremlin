@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-const (
+var (
 	Reset  = "\033[0m"
 	Bold   = "\033[1m"
 	Red    = "\033[31m"
@@ -21,43 +21,90 @@ const (
 
 var reader = bufio.NewReader(os.Stdin)
 
+// Plain output works in pipes and honors the conventional NO_COLOR setting.
+var interactive = terminalOutput()
+
+func terminalOutput() bool {
+	info, err := os.Stdout.Stat()
+	return err == nil && info.Mode()&os.ModeCharDevice != 0
+}
+
+func init() {
+	_, noColor := os.LookupEnv("NO_COLOR")
+	if noColor || !interactive || os.Getenv("TERM") == "dumb" {
+		Reset, Bold, Red, Green, Yellow, Cyan, Gray = "", "", "", "", "", "", ""
+	}
+}
+
 func Clear() {
-	fmt.Print("\033[H\033[2J")
+	if interactive && Reset != "" {
+		fmt.Print("\033[H\033[2J")
+	}
 }
 
 func Banner() {
-	title := "  G R E M L I N - I N - A - B O X  "
+	const logo = ` ____           _ _                     ___
+|  _ \ ___  ___(_) | ___ _ __   ___ ___  / _ \ _ __  ___
+| |_) / _ \/ __| | |/ _ \ '_ \ / __/ _ \| | | | '_ \/ __|
+|  _ <  __/\__ \ | |  __/ | | | (_|  __/| |_| | |_) \__ \
+|_| \_\___||___/_|_|\___|_| |_|\___\___| \___/| .__/|___/
+                                             |_|`
 	fmt.Println()
-	fmt.Print(Red + Bold)
-	for _, ch := range title {
-		fmt.Printf("%c", ch)
-		time.Sleep(8 * time.Millisecond)
+	// The requested brand color stays red in an interactive terminal,
+	// including terminals that inherit NO_COLOR or TERM=dumb.
+	bannerColor, bannerReset := "", ""
+	if interactive {
+		bannerColor, bannerReset = "\033[1;31m", "\033[0m"
 	}
-	fmt.Println(Reset)
-	fmt.Println(Gray + "  chaos engineering, interactively" + Reset)
+	fmt.Print(bannerColor)
+	for _, line := range strings.Split(logo, "\n") {
+		fmt.Println("  " + line)
+	}
+	fmt.Println(bannerReset)
+	fmt.Println("  " + bannerColor + "ResilenceOps" + bannerReset + Gray + "  /  APPLICATION RESILIENCE CONSOLE  /  v0.2" + Reset)
 	fmt.Println()
 }
 
-func Menu(title string, options []string) int {
-	fmt.Println(Bold + Cyan + title + Reset)
-	fmt.Println(strings.Repeat("-", len(title)))
-	for i, opt := range options {
-		fmt.Printf("  %s%d%s) %s\n", Yellow, i+1, Reset, opt)
-	}
-	fmt.Printf("  %sq%s) back / quit\n\n", Yellow, Reset)
-	fmt.Print("select> ")
+func MainMenu(options []string) int {
+	return menu("CONTROL CENTER", options, "Exit")
+}
 
-	line, _ := reader.ReadString(10)
-	line = strings.TrimSpace(line)
-	if line == "q" || line == "quit" {
-		return -1
+func Menu(title string, options []string) int {
+	return menu(title, options, "Back")
+}
+
+func menu(title string, options []string, exitLabel string) int {
+	const width = 66
+	fmt.Println()
+	fmt.Println(Gray + "  +" + strings.Repeat("-", width) + "+" + Reset)
+	fmt.Printf("%s  |%s %-64s %s|%s\n", Gray, Bold, strings.ToUpper(title), Gray, Reset)
+	fmt.Println(Gray + "  +" + strings.Repeat("-", width) + "+" + Reset)
+	for i, opt := range options {
+		chars := []rune(opt)
+		if len(chars) > 57 {
+			opt = string(chars[:54]) + "..."
+		}
+		fmt.Printf("%s  |%s  %s[%02d]%s  %-57s%s |%s\n", Gray, Reset, Red, i+1, Reset, opt, Gray, Reset)
 	}
-	n, err := strconv.Atoi(line)
-	if err != nil || n < 1 || n > len(options) {
-		fmt.Println(Red + "invalid selection" + Reset)
-		return -1
+	fmt.Printf("%s  |%s  %s[00]%s  %-57s%s |%s\n", Gray, Reset, Gray, Reset, exitLabel, Gray, Reset)
+	fmt.Println(Gray + "  +" + strings.Repeat("-", width) + "+" + Reset)
+	fmt.Println()
+	for {
+		fmt.Print("  " + Red + "resiletops" + Reset + " > ")
+		line, err := reader.ReadString('\n')
+		line = strings.TrimSpace(line)
+		if line == "0" || line == "00" || strings.EqualFold(line, "q") || strings.EqualFold(line, "quit") || (err != nil && line == "") {
+			return -1
+		}
+		n, parseErr := strconv.Atoi(line)
+		if parseErr == nil && n >= 1 && n <= len(options) {
+			return n - 1
+		}
+		fmt.Printf("%s  Choose 0–%d.%s\n", Yellow, len(options), Reset)
+		if err != nil {
+			return -1
+		}
 	}
-	return n - 1
 }
 
 func Ask(label string) string {
@@ -77,6 +124,16 @@ func AskDefault(label, def string) string {
 }
 
 func Spin(label string, work func() error) error {
+	if !interactive {
+		fmt.Println(label + "...")
+		err := work()
+		if err != nil {
+			fmt.Printf("[FAIL] %s: %v\n", label, err)
+		} else {
+			fmt.Printf("[OK] %s\n", label)
+		}
+		return err
+	}
 	frames := []string{"|", "/", "-", "+"}
 	done := make(chan error, 1)
 	start := time.Now()
@@ -114,7 +171,7 @@ func Pause() {
 
 func StepHeader(step int, total int, title string) {
 	fmt.Println()
-	fmt.Printf("%s%s=== STEP %d OF %d: %s ===%s\n", Bold, Cyan, step, total, strings.ToUpper(title), Reset)
+	fmt.Printf("%s%s=== STEP %d OF %d: %s ===%s\n", Bold, Red, step, total, strings.ToUpper(title), Reset)
 	fmt.Println()
 }
 
@@ -124,7 +181,10 @@ func AskConfirm(prompt string, defTrue bool) bool {
 		hint = "y/N"
 	}
 	fmt.Printf("%s [%s]: ", prompt, hint)
-	line, _ := reader.ReadString(10)
+	line, err := reader.ReadString(10)
+	if err != nil {
+		return false
+	}
 	line = strings.ToLower(strings.TrimSpace(line))
 	if line == "" {
 		return defTrue
@@ -133,28 +193,28 @@ func AskConfirm(prompt string, defTrue bool) bool {
 }
 
 func Info(msg string) {
-	fmt.Println(Gray + "  💡 " + msg + Reset)
+	fmt.Println(Gray + "  [i] " + msg + Reset)
 }
 
 func Success(msg string) {
-	fmt.Println(Green + Bold + "  ✓ " + msg + Reset)
+	fmt.Println(Green + Bold + "  [OK] " + msg + Reset)
 }
 
 func Warning(msg string) {
-	fmt.Println(Yellow + "  ⚠️  " + msg + Reset)
+	fmt.Println(Yellow + "  [!] " + msg + Reset)
 }
 
 func Card(title string, lines []string) {
 	fmt.Println()
-	fmt.Println(Cyan + "  ┌──────────────────────────────────────────────────────────────┐" + Reset)
-	fmt.Printf("%s  │ %s%-60s%s │%s\n", Cyan, Bold, title, Reset+Cyan, Reset)
-	fmt.Println(Cyan + "  ├──────────────────────────────────────────────────────────────┤" + Reset)
+	fmt.Println(Red + "  ┌──────────────────────────────────────────────────────────────┐" + Reset)
+	fmt.Printf("%s  │ %s%-60s%s │%s\n", Red, Bold, title, Reset+Red, Reset)
+	fmt.Println(Red + "  ├──────────────────────────────────────────────────────────────┤" + Reset)
 	for _, l := range lines {
-		if len(l) > 60 {
-			l = l[:57] + "..."
+		if chars := []rune(l); len(chars) > 60 {
+			l = string(chars[:57]) + "..."
 		}
-		fmt.Printf("%s  │%s %-60s %s│%s\n", Cyan, Reset, l, Cyan, Reset)
+		fmt.Printf("%s  │%s %-60s %s│%s\n", Red, Reset, l, Red, Reset)
 	}
-	fmt.Println(Cyan + "  └──────────────────────────────────────────────────────────────┘" + Reset)
+	fmt.Println(Red + "  └──────────────────────────────────────────────────────────────┘" + Reset)
 	fmt.Println()
 }
