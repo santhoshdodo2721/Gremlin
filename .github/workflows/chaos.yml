@@ -22,39 +22,45 @@ jobs:
         with:
           go-version: "1.22"
 
-      - name: Build gremlin
-        run: go build -o bin/gremlin ./cmd/gremlin
+      - name: Test and vet CLI
+        run: |
+          go test -race ./...
+          go vet ./...
+
+      - name: Build ResilenceOps
+        run: go build -o resiletops ./cmd/gremlin
 
       - name: Start the Application Under Test
         run: |
-          cd aut
-          docker compose up -d --build
+          git clone https://github.com/microservices-demo/microservices-demo.git aut/microservices-demo
+          cd aut/microservices-demo/deploy/docker-compose
+          docker compose -f docker-compose.yml up -d
           echo "Waiting for AUT to become healthy..."
-          for i in $(seq 1 30); do
-            if curl -sf http://localhost:8080/health > /dev/null; then
+          for i in $(seq 1 90); do
+            if curl -sf http://localhost/ > /dev/null; then
               echo "AUT is healthy"
               break
             fi
             sleep 2
           done
-          curl -sf http://localhost:8080/health
+          curl -sf http://localhost/
 
       - name: Run chaos attack - container-kill
-        run: ./bin/gremlin attack --name container-kill --target aut-api
+        run: ./resiletops attack --name container-kill --target docker-compose-front-end-1 --health-url http://localhost/
 
       - name: Run chaos attack - latency
-        run: ./bin/gremlin attack --name latency --target aut-api --delay-ms 200 --jitter-ms 20 --duration-s 10
+        run: ./resiletops attack --name latency --target docker-compose-front-end-1 --health-url http://localhost/ --delay-ms 200 --jitter-ms 20 --duration-s 10
 
       - name: Run chaos attack - cpu
-        run: ./bin/gremlin attack --name cpu --target aut-api --workers 2 --duration-s 10
+        run: ./resiletops attack --name cpu --target docker-compose-front-end-1 --health-url http://localhost/ --workers 2 --duration-s 10
 
       - name: Run resilience threshold test
         run: |
-          ./bin/gremlin threshold --attack latency --target aut-api --commit ${{ github.sha }}
-          ./bin/gremlin threshold-check --tolerance-pct 20
+          ./resiletops threshold --attack latency --target docker-compose-front-end-1 --health-url http://localhost/ --commit ${{ github.sha }}
+          ./resiletops threshold-check --tolerance-pct 20
 
       - name: Show report
-        run: ./bin/gremlin report
+        run: ./resiletops report
 
       - name: Upload chaos report as artifact
         uses: actions/upload-artifact@v4
@@ -74,5 +80,5 @@ jobs:
       - name: Tear down AUT
         if: always()
         run: |
-          cd aut
-          docker compose down -v
+          cd aut/microservices-demo/deploy/docker-compose
+          docker compose -f docker-compose.yml down -v

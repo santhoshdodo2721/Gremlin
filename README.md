@@ -1,123 +1,94 @@
-# Gremlin-in-a-Box
+# ResilenceOps
 
-A chaos engineering platform built from scratch in Go, with zero third-party dependencies. It injects controlled failures (container kills, network latency, CPU exhaustion) into a live application, measures how long the system takes to recover, and exposes the results as metrics, dashboards, and reports.
+An application resilience console with guided chaos experiments, continuous tests,
+recovery checks, saved reports, and a Grafana dashboard.
 
-## Why zero dependencies
+## Start
 
-Every piece here - the Docker Engine API client, the Prometheus metrics exporter, the CLI - is hand-written against the Go standard library instead of using the Docker SDK, Cobra, or the Prometheus client library. This was a deliberate choice: it means the whole project builds anywhere with just a Go toolchain, there is no dependency-version drift to break a grading run, and every line of behavior can be explained without pointing at a third-party library doing the real work underneath.
+Go 1.22+ and Docker Compose are required. Build and open the menu from this directory:
 
-## Architecture
-
-Two systems, kept deliberately separate:
-
-- Application Under Test (AUT) - the thing that gets attacked. A minimal Go HTTP API with a /health endpoint, backed by PostgreSQL, running in Docker Compose.
-- Gremlin-in-a-Box - the chaos platform itself. A CLI that drives a controller, which loads an attack plugin, runs it against the AUT, measures recovery time, and records everything.
-
-This separation means the AUT can be swapped for any other containerized application later without touching a single line of Gremlin.
-## What is actually implemented
-
-| Component | Status | Notes |
-|---|---|---|
-| Universal Target Support | Done | Attacks any Docker container without in-container tools |
-| CLI | Done | interactive menu, status, attack, report, serve-metrics, schedule, threshold, loadtest |
-| Controller | Done | Orchestrates attack -> recovery measurement -> report |
-| Docker manager | Done | Raw Docker Engine API client (unix socket), pause/unpause, update cgroups |
-| Network chaos | Done | Latency, packet-loss, corruption via sidecar or exec, zero target container changes |
-| CPU chaos | Done | Automatic Cgroup CPU throttling fallback or stress-ng |
-| Container chaos | Done | container-kill (crash simulation) and container-pause (freeze simulation) |
-| Plugin architecture | Done | 6 built-in plugins (cpu, latency, packet-loss, corruption, container-kill, container-pause) |
-| Scheduler | Done | Recurring attacks on a configurable interval, schedule.json |
-| Metrics | Done | Hand-rolled Prometheus text exposition format, labeled by attack type |
-| Dashboard | Done | Grafana, read-only, 8 panels |
-| Reports | Done | JSON file store, queryable via gremlin report |
-| CI/CD | Done | GitHub Actions: build, run AUT, run attacks, upload report artifact |
-| Kubernetes manager | Not built | Would follow the same pattern as the Docker manager, against the kube-apiserver REST API |
-
-## Project layout
-
-    gremlin-in-a-box/
-      cmd/gremlin/main.go         CLI entrypoint
-      internal/
-        config/                   JSON config + schedule loading
-        logger/                   structured logging (log/slog)
-        dockerapi/                Docker Engine API client (unix socket)
-        network/                  tc/netem wrapper
-        plugins/                  Plugin interface, registry, and the 3 built-in attacks
-        controller/               orchestration: run attack, measure recovery, save report
-        metrics/                  Prometheus-format /metrics endpoint
-        reports/                  JSON-backed report store
-        scheduler/                recurring attack scheduling
-      aut/                        Application Under Test (Go API + Postgres)
-      monitoring/                 Prometheus + Grafana compose stack
-      .github/workflows/chaos.yml CI pipeline
-      schedule.json               recurring attack configuration
-      config.json                 Gremlin runtime configuration
-## Running it
-
-Bring up the application under test:
-
-    cd aut
-    docker compose up -d --build
-    curl http://localhost:8080/health
-
-Build Gremlin:
-
-    go build -o bin/gremlin ./cmd/gremlin
-
-See available attacks:
-
-    ./bin/gremlin status
-
-Run attacks against ANY container manually:
 ```bash
-# 1. Container freeze (simulates hung/unresponsive service)
-./bin/gremlin attack --name container-pause --target <container> --duration-s 10
-
-# 2. Network latency (works on any container via network namespace injection)
-./bin/gremlin attack --name latency --target <container> --delay-ms 300 --duration-s 15 --health-url http://localhost:80/
-
-# 3. Network packet loss & corruption
-./bin/gremlin attack --name packet-loss --target <container> --percent 25 --duration-s 15
-./bin/gremlin attack --name corruption --target <container> --percent 15 --duration-s 15
-
-# 4. CPU chaos (cgroup quota throttling or stress-ng)
-./bin/gremlin attack --name cpu --target <container> --quota-pct 10 --duration-s 15
-
-# 5. Crash simulation (stop & restart)
-./bin/gremlin attack --name container-kill --target <container>
+go build -o resiletops ./cmd/gremlin
+./resiletops
 ```
 
-Check what happened:
+The banner is bold red in a terminal. Menu options:
 
-    ./bin/gremlin report
+1. Guided experiment
+2. Continuous testing
+3. Results & history
+4. Application status
+5. Advanced tools
+6. View running services
+0. Back or exit
 
-Run attacks automatically on a schedule (edit schedule.json to change intervals):
+Running services displays application service names, container names, and status.
+Discovery uses Docker Compose ownership labels from `application_directory` in
+`config.json`. Unrelated applications and monitoring containers are excluded.
 
-    ./bin/gremlin schedule --file schedule.json
+## Test application
 
-Expose metrics for Prometheus:
+Sock Shop is the configured application under test. Clone once and start it:
 
-    ./bin/gremlin serve-metrics
+```bash
+git clone https://github.com/microservices-demo/microservices-demo.git aut/microservices-demo
+cd aut/microservices-demo/deploy/docker-compose
+docker compose -f docker-compose.yml up -d
+```
 
-Bring up Prometheus + Grafana:
+Open http://localhost/. The default recovery check uses this endpoint; it verifies
+HTTP availability, so choose a more specific endpoint when testing backend behavior.
+The upstream checkout is kept locally and ignored by this project's Git repository.
+The old API/Postgres sample has been removed; CI now uses Sock Shop too.
 
-    cd monitoring
-    docker compose up -d
+## Continuous testing
 
-Grafana: http://localhost:3001 (default admin/admin, or whatever you set). Prometheus: http://localhost:9091.
-## CI/CD
+```bash
+./resiletops targets
+./resiletops continuous --target docker-compose-front-end-1 --attacks container-pause,cpu --duration-s 5 --interval-s 10
+# A bounded run:
+./resiletops continuous --target docker-compose-front-end-1 --attacks container-pause --duration-s 1 --interval-s 1 --cycles 2
+```
 
-Every push to main triggers .github/workflows/chaos.yml, which builds Gremlin from a clean checkout, brings up the AUT in a container, runs all three attack types against it, and uploads the resulting gremlin-reports.json as a downloadable build artifact. This proves the whole pipeline works unattended, not just on one development machine.
+Tests execute sequentially, verify recovery, and wait between faults. A failed test
+stops the run. Ctrl+C cancels the active test and waits for cleanup. Application
+membership is checked before every fault. Supported attacks include latency,
+packet loss, corruption, CPU throttling, container pause, and restart.
 
-## Design notes worth calling out
+Use `./resiletops --help` for direct attacks, scheduling, load tests, threshold tests,
+and reports. `schedule.json` supplies recurring jobs; run it explicitly with
+`./resiletops schedule --file schedule.json`.
 
-- Plugin architecture: adding a new attack type means writing one file that implements the Plugin interface and registering it in internal/plugins/setup.go. The controller and CLI never need to change.
-- Read-only dashboard: Grafana only ever reads from Prometheus; it has no ability to trigger or control attacks. Observability and control are kept as separate concerns, matching how production chaos engineering tools are designed.
-- Recovery measurement is real: after every attack, the controller polls the AUT actual /health endpoint until it responds, rather than assuming recovery based on a fixed delay.
-- Metrics are computed from the reports file on every scrape, not from in-memory state - this means metrics stay correct even though each gremlin attack invocation is a separate, short-lived process.
+## Monitoring
 
-## Known limitations
+```bash
+docker compose -f monitoring/docker-compose.yml up -d --build
+python3 monitoring/verify-data.py
+```
 
-- No Kubernetes manager yet (Docker-only for container/network/CPU attacks).
-- Recovery time granularity is limited by the health-check poll interval (500ms), so very fast recoveries are all reported in the low single-digit milliseconds and do not meaningfully differentiate between attack types against this particular AUT, which is intentionally lightweight.
-- The network chaos plugin (tc/netem) has been verified working against a local Docker host; behavior inside more restricted CI environments that may not grant full NET_ADMIN capability to nested containers has not been separately confirmed.
+Grafana: http://localhost:3001 (initial credentials admin/admin).
+Prometheus: http://localhost:9091.
+
+The persistent exporter reads `gremlin-reports.json` through a directory mount so
+atomic report replacements remain visible. Grafana uses the internal Prometheus
+service address. The dashboard includes gradient figures, subtle animation, and
+reduced-motion support. Missing recovery measurements remain unmeasured rather
+than becoming fabricated zeroes. Historical success and verified recovery are
+reported separately. The audit compares live Grafana queries against saved reports.
+
+Report history and `resilience-history.json` are retained across upgrades.
+The old launchers are retired; the protected original binary remains archived in
+`.retired-bin` pending administrator removal. The only current launcher is
+`./resiletops`.
+
+## Development
+
+```bash
+go test -race ./...
+go vet ./...
+go build -o resiletops ./cmd/gremlin
+```
+
+Source stays under `cmd/gremlin` and `internal` to preserve module imports.
+GitHub Actions builds the launcher, starts Sock Shop, runs faults and threshold
+checks, uploads reports, and tears down its CI application.
