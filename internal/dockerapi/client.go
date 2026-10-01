@@ -1,14 +1,15 @@
 package dockerapi
 
 import (
-"bytes"
-"context"
-"encoding/json"
-"fmt"
-"io"
-"net"
-"net/http"
-"time"
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"strings"
+	"time"
 )
 
 const apiVersion = "v1.43"
@@ -146,11 +147,23 @@ if err != nil {
 return "", err
 }
 defer startResp.Body.Close()
-out, err := io.ReadAll(startResp.Body)
-if err != nil {
-return "", err
-}
-return string(out), nil
+	out, err := io.ReadAll(startResp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	inspectResp, err := c.do(ctx, http.MethodGet, "/exec/"+created.Id+"/json", nil)
+	if err == nil {
+		defer inspectResp.Body.Close()
+		var inspect struct {
+			ExitCode int `json:"ExitCode"`
+		}
+		if err := json.NewDecoder(inspectResp.Body).Decode(&inspect); err == nil && inspect.ExitCode != 0 {
+			return string(out), fmt.Errorf("exec exited with code %d: %s", inspect.ExitCode, strings.TrimSpace(string(out)))
+		}
+	}
+
+	return string(out), nil
 }
 
 // StartBackground runs cmd inside a container without waiting for it to
@@ -242,9 +255,167 @@ if sysDelta > 0 && cpuDelta > 0 {
 cpuPercent = (cpuDelta / sysDelta) * onlineCPUs * 100.0
 }
 
-return Stats{
-CPUPercent: cpuPercent,
-MemUsedMB:  float64(raw.MemoryStats.Usage) / 1024.0 / 1024.0,
-MemLimitMB: float64(raw.MemoryStats.Limit) / 1024.0 / 1024.0,
-}, nil
+	return Stats{
+		CPUPercent: cpuPercent,
+		MemUsedMB:  float64(raw.MemoryStats.Usage) / 1024.0 / 1024.0,
+		MemLimitMB: float64(raw.MemoryStats.Limit) / 1024.0 / 1024.0,
+	}, nil
 }
+
+func (c *Client) PauseContainer(ctx context.Context, id string) error {
+	resp, err := c.do(ctx, http.MethodPost, "/containers/"+id+"/pause", nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("pause %s: unexpected status %d", id, resp.StatusCode)
+	}
+	return nil
+}
+
+func (c *Client) UnpauseContainer(ctx context.Context, id string) error {
+	resp, err := c.do(ctx, http.MethodPost, "/containers/"+id+"/unpause", nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("unpause %s: unexpected status %d", id, resp.StatusCode)
+	}
+	return nil
+}
+
+func (c *Client) UpdateContainer(ctx context.Context, id string, update map[string]any) error {
+	data, err := json.Marshal(update)
+	if err != nil {
+		return err
+	}
+	resp, err := c.do(ctx, http.MethodPost, "/containers/"+id+"/update", bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("update %s: status %d: %s", id, resp.StatusCode, string(body))
+	}
+	return nil
+}
+
+type ImageSummary struct {
+	RepoTags []string `json:"RepoTags"`
+}
+
+func (c *Client) ListImages(ctx context.Context) ([]string, error) {
+	resp, err := c.do(ctx, http.MethodGet, "/images/json", nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("list images: unexpected status %d", resp.StatusCode)
+	}
+	var raw []ImageSummary
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, err
+	}
+	var tags []string
+	for _, img := range raw {
+		tags = append(tags, img.RepoTags...)
+	}
+	return tags, nil
+}
+
+func (c *Client) FindHelperImage(ctx context.Context, preferred string) string {
+	images, err := c.ListImages(ctx)
+	if err != nil {
+		if preferred != "" {
+			return preferred
+		}
+		return "gremlin-helper:latest"
+	}
+	candidates := []string{preferred, "gremlin-helper:latest", "aut-api:latest", "nicolaka/netshoot:latest", "alpine:latest"}
+	for _, cand := range candidates {
+		if cand == "" {
+			continue
+		}
+		for _, tag := range images {
+			if tag == cand || strings.HasPrefix(tag, cand+":") || strings.HasPrefix(tag, cand) {
+				return cand
+			}
+		}
+	}
+	if preferred != "" {
+		return preferred
+	}
+	return "gremlin-helper:latest"
+}
+
+// RunSidecar runs a command inside an ephemeral container joined to target's network namespace
+// with CAP_NET_ADMIN. This allows injecting network latency/loss into ANY target container
+// without requiring the target container to have tc or NET_ADMIN privileges.
+func (c *Client) RunSidecar(ctx context.Context, targetContainerID string, cmd []string) (string, error) {
+	helperImage := c.FindHelperImage(ctx, "gremlin-helper:latest")
+	createBody, _ := json.Marshal(map[string]any{
+		"Image": helperImage,
+		"Cmd":   cmd,
+		"HostConfig": map[string]any{
+			"NetworkMode": "container:" + targetContainerID,
+			"CapAdd":      []string{"NET_ADMIN"},
+		},
+	})
+	resp, err := c.do(ctx, http.MethodPost, "/containers/create", bytes.NewReader(createBody))
+	if err != nil {
+		return "", fmt.Errorf("sidecar create: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("sidecar create status %d: %s", resp.StatusCode, string(body))
+	}
+	var created struct {
+		Id string `json:"Id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
+		return "", err
+	}
+
+	defer func() {
+		delReq, _ := http.NewRequestWithContext(context.Background(), http.MethodDelete, c.url("/containers/"+created.Id+"?v=true&force=true"), nil)
+		if delResp, err := c.http.Do(delReq); err == nil && delResp != nil {
+			delResp.Body.Close()
+		}
+	}()
+
+	startResp, err := c.do(ctx, http.MethodPost, "/containers/"+created.Id+"/start", nil)
+	if err != nil {
+		return "", fmt.Errorf("sidecar start: %w", err)
+	}
+	startResp.Body.Close()
+
+	waitResp, err := c.do(ctx, http.MethodPost, "/containers/"+created.Id+"/wait", nil)
+	if err != nil {
+		return "", fmt.Errorf("sidecar wait: %w", err)
+	}
+	defer waitResp.Body.Close()
+
+	var waitStatus struct {
+		StatusCode int `json:"StatusCode"`
+	}
+	json.NewDecoder(waitResp.Body).Decode(&waitStatus)
+
+	logsResp, err := c.do(ctx, http.MethodGet, "/containers/"+created.Id+"/logs?stdout=true&stderr=true", nil)
+	out := ""
+	if err == nil && logsResp != nil {
+		defer logsResp.Body.Close()
+		raw, _ := io.ReadAll(logsResp.Body)
+		out = string(raw)
+	}
+
+	if waitStatus.StatusCode != 0 {
+		return out, fmt.Errorf("sidecar command failed with exit code %d: %s", waitStatus.StatusCode, out)
+	}
+	return out, nil
+}
+

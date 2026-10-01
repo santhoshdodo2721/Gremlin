@@ -1,8 +1,10 @@
 # Compiled binary
 bin/
+gremlin
 
 # Local attack history (generated at runtime, not source)
 gremlin-reports.json
+load-test-result.json
 
 # Go build/test artifacts
 *.test

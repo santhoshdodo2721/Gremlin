@@ -55,7 +55,7 @@ func main() {
 		}
 
 	case "attack":
-		runAttackCmd(ctrl)
+		runAttackCmd(ctrl, cfg)
 
 	case "report":
 		list, err := store.List()
@@ -123,14 +123,18 @@ func runScheduleCmd(log *slog.Logger, ctrl *controller.Controller) {
 	scheduler.Run(ctx, log, ctrl, jobs)
 }
 
-func runAttackCmd(ctrl *controller.Controller) {
+func runAttackCmd(ctrl *controller.Controller, cfg config.Config) {
 	fs := flag.NewFlagSet("attack", flag.ExitOnError)
-	attackName := fs.String("name", "", "attack plugin to run")
+	attackName := fs.String("name", "", "attack plugin to run (container-kill, container-pause, latency, packet-loss, corruption, cpu)")
 	target := fs.String("target", "", "container ID or name to attack")
+	healthURL := fs.String("health-url", cfg.TargetHealthURL, "target health URL to verify recovery (empty to skip)")
 	delayMs := fs.String("delay-ms", "", "latency plugin: delay in ms")
 	jitterMs := fs.String("jitter-ms", "", "latency plugin: jitter in ms")
 	durationS := fs.String("duration-s", "", "attack duration in seconds")
 	workers := fs.String("workers", "", "cpu plugin: number of stress workers")
+	method := fs.String("method", "", "cpu plugin: auto, throttle, or stress")
+	quotaPct := fs.String("quota-pct", "", "cpu plugin: CPU quota percent for throttle (default 10)")
+	percent := fs.String("percent", "", "packet-loss or corruption plugin: percentage (e.g. 20)")
 	restart := fs.String("restart", "", "container-kill plugin: restart after stopping")
 	fs.Parse(os.Args[2:])
 
@@ -138,6 +142,13 @@ func runAttackCmd(ctrl *controller.Controller) {
 		fmt.Println("usage: gremlin attack --name <attack> --target <container> [flags]")
 		os.Exit(1)
 	}
+
+	healthCheckURL := cfg.TargetHealthURL
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "health-url" {
+			healthCheckURL = *healthURL
+		}
+	})
 
 	params := plugins.Params{}
 	if *delayMs != "" {
@@ -152,29 +163,38 @@ func runAttackCmd(ctrl *controller.Controller) {
 	if *workers != "" {
 		params["workers"] = *workers
 	}
+	if *method != "" {
+		params["method"] = *method
+	}
+	if *quotaPct != "" {
+		params["quota_pct"] = *quotaPct
+	}
+	if *percent != "" {
+		params["percent"] = *percent
+	}
 	if *restart != "" {
 		params["restart"] = *restart
 	}
 
-	if err := ctrl.RunAttack(context.Background(), *attackName, *target, params); err != nil {
+	if err := ctrl.RunAttackWithHealthURL(context.Background(), *attackName, *target, params, healthCheckURL); err != nil {
 		fmt.Fprintln(os.Stderr, "attack error:", err)
 		os.Exit(1)
 	}
 }
 
 func printUsage() {
-	fmt.Println("gremlin - chaos engineering CLI")
+	fmt.Println("gremlin - universal chaos engineering CLI")
 	fmt.Println("")
 	fmt.Println("Usage:")
 	fmt.Println("  gremlin                (launches interactive menu)")
 	fmt.Println("  gremlin menu")
 	fmt.Println("  gremlin version")
 	fmt.Println("  gremlin status")
-	fmt.Println("  gremlin attack --name <attack> --target <container> [flags]")
+	fmt.Println("  gremlin attack --name <attack> --target <container> [--health-url <url>] [flags]")
 	fmt.Println("  gremlin report")
 	fmt.Println("  gremlin serve-metrics")
 	fmt.Println("  gremlin schedule --file schedule.json")
-	fmt.Println("  gremlin threshold --attack latency|cpu --target <container>")
+	fmt.Println("  gremlin threshold --attack latency|cpu --target <container> [--health-url <url>]")
 	fmt.Println("  gremlin threshold-check")
 	fmt.Println("  gremlin loadtest --target <container> --url <http endpoint>")
 }

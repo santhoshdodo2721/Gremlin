@@ -18,18 +18,19 @@ This separation means the AUT can be swapped for any other containerized applica
 
 | Component | Status | Notes |
 |---|---|---|
-| Application Under Test | Done | Go API + PostgreSQL, Docker Compose |
-| CLI | Done | version, status, attack, report, serve-metrics, schedule |
+| Universal Target Support | Done | Attacks any Docker container without in-container tools |
+| CLI | Done | interactive menu, status, attack, report, serve-metrics, schedule, threshold, loadtest |
 | Controller | Done | Orchestrates attack -> recovery measurement -> report |
-| Docker manager | Done | Raw Docker Engine API client (unix socket), no SDK |
-| Network chaos | Done | Latency via tc/netem, run through Docker exec |
-| CPU chaos | Done | stress-ng, run through Docker exec |
-| Plugin architecture | Done | Plugin interface + registry, adding an attack is one new file |
+| Docker manager | Done | Raw Docker Engine API client (unix socket), pause/unpause, update cgroups |
+| Network chaos | Done | Latency, packet-loss, corruption via sidecar or exec, zero target container changes |
+| CPU chaos | Done | Automatic Cgroup CPU throttling fallback or stress-ng |
+| Container chaos | Done | container-kill (crash simulation) and container-pause (freeze simulation) |
+| Plugin architecture | Done | 6 built-in plugins (cpu, latency, packet-loss, corruption, container-kill, container-pause) |
 | Scheduler | Done | Recurring attacks on a configurable interval, schedule.json |
 | Metrics | Done | Hand-rolled Prometheus text exposition format, labeled by attack type |
 | Dashboard | Done | Grafana, read-only, 8 panels |
 | Reports | Done | JSON file store, queryable via gremlin report |
-| CI/CD | Done | GitHub Actions: build, run AUT, run 3 attacks, upload report artifact |
+| CI/CD | Done | GitHub Actions: build, run AUT, run attacks, upload report artifact |
 | Kubernetes manager | Not built | Would follow the same pattern as the Docker manager, against the kube-apiserver REST API |
 
 ## Project layout
@@ -67,11 +68,24 @@ See available attacks:
 
     ./bin/gremlin status
 
-Run one manually:
+Run attacks against ANY container manually:
+```bash
+# 1. Container freeze (simulates hung/unresponsive service)
+./bin/gremlin attack --name container-pause --target <container> --duration-s 10
 
-    ./bin/gremlin attack --name container-kill --target aut-api
-    ./bin/gremlin attack --name latency --target aut-api --delay-ms 300 --duration-s 15
-    ./bin/gremlin attack --name cpu --target aut-api --workers 2 --duration-s 15
+# 2. Network latency (works on any container via network namespace injection)
+./bin/gremlin attack --name latency --target <container> --delay-ms 300 --duration-s 15 --health-url http://localhost:80/
+
+# 3. Network packet loss & corruption
+./bin/gremlin attack --name packet-loss --target <container> --percent 25 --duration-s 15
+./bin/gremlin attack --name corruption --target <container> --percent 15 --duration-s 15
+
+# 4. CPU chaos (cgroup quota throttling or stress-ng)
+./bin/gremlin attack --name cpu --target <container> --quota-pct 10 --duration-s 15
+
+# 5. Crash simulation (stop & restart)
+./bin/gremlin attack --name container-kill --target <container>
+```
 
 Check what happened:
 

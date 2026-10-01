@@ -25,7 +25,12 @@ mu   sync.Mutex
 }
 
 func NewStore(path string) *Store {
-return &Store{path: path}
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		if _, errParent := os.Stat("../" + path); errParent == nil {
+			path = "../" + path
+		}
+	}
+	return &Store{path: path}
 }
 
 func (s *Store) load() ([]Report, error) {

@@ -111,3 +111,50 @@ func Pause() {
 	fmt.Print("\npress enter to continue...")
 	reader.ReadString(10)
 }
+
+func StepHeader(step int, total int, title string) {
+	fmt.Println()
+	fmt.Printf("%s%s=== STEP %d OF %d: %s ===%s\n", Bold, Cyan, step, total, strings.ToUpper(title), Reset)
+	fmt.Println()
+}
+
+func AskConfirm(prompt string, defTrue bool) bool {
+	hint := "Y/n"
+	if !defTrue {
+		hint = "y/N"
+	}
+	fmt.Printf("%s [%s]: ", prompt, hint)
+	line, _ := reader.ReadString(10)
+	line = strings.ToLower(strings.TrimSpace(line))
+	if line == "" {
+		return defTrue
+	}
+	return line == "y" || line == "yes"
+}
+
+func Info(msg string) {
+	fmt.Println(Gray + "  💡 " + msg + Reset)
+}
+
+func Success(msg string) {
+	fmt.Println(Green + Bold + "  ✓ " + msg + Reset)
+}
+
+func Warning(msg string) {
+	fmt.Println(Yellow + "  ⚠️  " + msg + Reset)
+}
+
+func Card(title string, lines []string) {
+	fmt.Println()
+	fmt.Println(Cyan + "  ┌──────────────────────────────────────────────────────────────┐" + Reset)
+	fmt.Printf("%s  │ %s%-60s%s │%s\n", Cyan, Bold, title, Reset+Cyan, Reset)
+	fmt.Println(Cyan + "  ├──────────────────────────────────────────────────────────────┤" + Reset)
+	for _, l := range lines {
+		if len(l) > 60 {
+			l = l[:57] + "..."
+		}
+		fmt.Printf("%s  │%s %-60s %s│%s\n", Cyan, Reset, l, Cyan, Reset)
+	}
+	fmt.Println(Cyan + "  └──────────────────────────────────────────────────────────────┘" + Reset)
+	fmt.Println()
+}
