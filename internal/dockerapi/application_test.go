@@ -26,6 +26,18 @@ func TestApplicationConfigFileFallback(t *testing.T) {
 		t.Fatal("Compose config ownership was not recognized")
 	}
 }
+
+func TestApplicationContainersInUnifiedStack(t *testing.T) {
+	containers := []Container{
+		{Names: []string{"/front-end"}, Labels: map[string]string{"com.docker.compose.project.working_dir": "/workspace", "io.gremlin.application.directory": "aut"}},
+		{Names: []string{"/grafana"}, Labels: map[string]string{"com.docker.compose.project.working_dir": "/workspace"}},
+		{Names: []string{"/outside"}, Labels: map[string]string{"com.docker.compose.project.working_dir": "/other", "io.gremlin.application.directory": "aut"}},
+	}
+	got := ApplicationContainers(containers, "/workspace/aut")
+	if len(got) != 1 || got[0].DisplayName() != "front-end" {
+		t.Fatalf("unified stack scope incorrect: %+v", got)
+	}
+}
 func TestMatchesContainerIdentity(t *testing.T) {
 	c := Container{ID: "123456789abc0123456789", Names: []string{"/aut-api"}}
 	for _, target := range []string{c.ID, "123456789abc", "aut-api", "/aut-api"} {

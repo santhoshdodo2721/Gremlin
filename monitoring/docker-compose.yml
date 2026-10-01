@@ -46,4 +46,6 @@ services:
 
 volumes:
   prometheus-data:
+    name: monitoring_prometheus-data
   grafana-data:
+    name: monitoring_grafana-data

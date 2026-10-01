@@ -30,7 +30,7 @@ cd Gremlin
 
 Already have the project? Open its root directory and continue below.
 
-### 2. Start Sock Shop
+### 2. Start the application and monitoring
 
 Clone the test application once:
 
@@ -41,8 +41,10 @@ git clone https://github.com/microservices-demo/microservices-demo.git aut/micro
 Start it from the project root:
 
 ```bash
-docker compose -f aut/microservices-demo/deploy/docker-compose/docker-compose.yml up -d
+docker compose up -d
 ```
+
+This starts Sock Shop, the metrics exporter, Prometheus, and Grafana together. Use `docker compose up` to keep logs in the terminal, or `docker compose up -d` to run everything in the background. The root Compose file uses Compose `include`, which requires Docker Compose 2.20 or newer.
 
 Wait for startup, then open [the storefront](http://localhost/). Sock Shop uses host ports **80** and **8080**, so those ports must be available.
 
@@ -77,10 +79,10 @@ For a first test, choose **6** to confirm your services are running, then choose
 
 ## View the dashboard
 
-From the project root, start monitoring:
+Monitoring starts with the application. From the project root, start or rebuild the complete stack:
 
 ```bash
-docker compose -f monitoring/docker-compose.yml up -d --build
+docker compose up -d --build
 ```
 
 Open [Grafana](http://localhost:3001), sign in with the initial credentials **admin / admin**, and open **Gremlin / Experiments**. Prometheus is available at [localhost:9091](http://localhost:9091).
@@ -149,14 +151,13 @@ Scheduling starts only when you run the schedule command.
 | No application services appear | Start Sock Shop and confirm `application_directory` points to its Compose directory. |
 | Docker is unavailable | Check that Docker is running and your user can access its socket. |
 | Latency or packet-loss test fails | Build `gremlin-helper:latest` using the command in setup. |
-| Grafana shows no data | Run an experiment, start monitoring, and check `docker compose -f monitoring/docker-compose.yml ps`. |
+| Grafana shows no data | Run an experiment, start monitoring, and check `docker compose ps`. |
 | Storefront does not open | Check Sock Shop startup and whether host ports 80 or 8080 are already in use. |
 
 ## Stop the containers
 
 ```bash
-docker compose -f aut/microservices-demo/deploy/docker-compose/docker-compose.yml stop
-docker compose -f monitoring/docker-compose.yml stop
+docker compose stop
 ```
 
 ## Development

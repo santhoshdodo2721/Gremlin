@@ -22,6 +22,13 @@ func ApplicationContainers(containers []Container, directory string) []Container
 	for _, container := range containers {
 		workingDir := container.Labels["com.docker.compose.project.working_dir"]
 		belongs := workingDir != "" && filepath.Clean(workingDir) == directory
+		// The root stack marks application services while monitoring shares its project.
+		if source := container.Labels["io.gremlin.application.directory"]; source != "" && filepath.IsAbs(workingDir) {
+			if !filepath.IsAbs(source) {
+				source = filepath.Join(workingDir, source)
+			}
+			belongs = filepath.Clean(source) == directory
+		}
 		if workingDir == "" {
 			for _, file := range strings.Split(container.Labels["com.docker.compose.project.config_files"], ",") {
 				if filepath.IsAbs(file) && filepath.Dir(filepath.Clean(file)) == directory {

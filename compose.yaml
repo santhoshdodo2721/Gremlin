@@ -1,0 +1,85 @@
+name: docker-compose
+
+include:
+  - monitoring/docker-compose.yml
+
+x-application: &application
+  labels:
+    io.gremlin.application.directory: aut/microservices-demo/deploy/docker-compose
+
+services:
+  carts:
+    <<: *application
+    extends:
+      file: aut/microservices-demo/deploy/docker-compose/docker-compose.yml
+      service: carts
+  carts-db:
+    <<: *application
+    extends:
+      file: aut/microservices-demo/deploy/docker-compose/docker-compose.yml
+      service: carts-db
+  catalogue:
+    <<: *application
+    extends:
+      file: aut/microservices-demo/deploy/docker-compose/docker-compose.yml
+      service: catalogue
+  catalogue-db:
+    <<: *application
+    extends:
+      file: aut/microservices-demo/deploy/docker-compose/docker-compose.yml
+      service: catalogue-db
+  edge-router:
+    <<: *application
+    extends:
+      file: aut/microservices-demo/deploy/docker-compose/docker-compose.yml
+      service: edge-router
+  front-end:
+    <<: *application
+    extends:
+      file: aut/microservices-demo/deploy/docker-compose/docker-compose.yml
+      service: front-end
+  orders:
+    <<: *application
+    extends:
+      file: aut/microservices-demo/deploy/docker-compose/docker-compose.yml
+      service: orders
+  orders-db:
+    <<: *application
+    extends:
+      file: aut/microservices-demo/deploy/docker-compose/docker-compose.yml
+      service: orders-db
+  payment:
+    <<: *application
+    extends:
+      file: aut/microservices-demo/deploy/docker-compose/docker-compose.yml
+      service: payment
+  queue-master:
+    <<: *application
+    extends:
+      file: aut/microservices-demo/deploy/docker-compose/docker-compose.yml
+      service: queue-master
+  rabbitmq:
+    <<: *application
+    extends:
+      file: aut/microservices-demo/deploy/docker-compose/docker-compose.yml
+      service: rabbitmq
+  shipping:
+    <<: *application
+    extends:
+      file: aut/microservices-demo/deploy/docker-compose/docker-compose.yml
+      service: shipping
+  user:
+    <<: *application
+    extends:
+      file: aut/microservices-demo/deploy/docker-compose/docker-compose.yml
+      service: user
+  user-db:
+    <<: *application
+    extends:
+      file: aut/microservices-demo/deploy/docker-compose/docker-compose.yml
+      service: user-db
+  user-sim:
+    <<: *application
+    extends:
+      file: aut/microservices-demo/deploy/docker-compose/docker-compose.yml
+      service: user-sim
