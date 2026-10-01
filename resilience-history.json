@@ -22,5 +22,41 @@
         "timestamp_unix": 1786120782
       }
     ]
+  },
+  {
+    "commit_sha": "interactive",
+    "results": [
+      {
+        "attack": "latency",
+        "target": "aut-api",
+        "breaking_point": 100,
+        "unit": "ms",
+        "timestamp_unix": 1790847395
+      }
+    ]
+  },
+  {
+    "commit_sha": "interactive",
+    "results": [
+      {
+        "attack": "latency",
+        "target": "aut-api",
+        "breaking_point": 100,
+        "unit": "ms",
+        "timestamp_unix": 1790848083
+      }
+    ]
+  },
+  {
+    "commit_sha": "interactive-full-suite",
+    "results": [
+      {
+        "attack": "latency",
+        "target": "aut-api",
+        "breaking_point": 100,
+        "unit": "ms",
+        "timestamp_unix": 1790849126
+      }
+    ]
   }
 ]
