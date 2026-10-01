@@ -36,6 +36,13 @@ cd aut/microservices-demo/deploy/docker-compose
 docker compose -f docker-compose.yml up -d
 ```
 
+Build the network-fault helper once before running latency, packet-loss, or
+corruption experiments (from the project root):
+
+```bash
+docker build -t gremlin-helper:latest -f tools/netem.Dockerfile .
+```
+
 Open http://localhost/. The default recovery check uses this endpoint; it verifies
 HTTP availability, so choose a more specific endpoint when testing backend behavior.
 The upstream checkout is kept locally and ignored by this project's Git repository.
