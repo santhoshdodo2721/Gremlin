@@ -82,5 +82,17 @@
         "timestamp_unix": 1790855083
       }
     ]
+  },
+  {
+    "commit_sha": "49b7568afea419d8a5c6a77225b545d99749b87d",
+    "results": [
+      {
+        "attack": "latency",
+        "target": "docker-compose-front-end-1",
+        "breaking_point": 400,
+        "unit": "ms",
+        "timestamp_unix": 1790856262
+      }
+    ]
   }
 ]
