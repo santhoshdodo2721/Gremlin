@@ -40,8 +40,8 @@ func (p *CPUPlugin) Run(ctx context.Context, target string, params Params) (Resu
 			return Result{Success: false, Message: err.Error()}, err
 		}
 		return Result{
-			Success: true,
-			Message: fmt.Sprintf("ran %d cpu workers for %ds (stress-ng)", workers, durationS),
+			Success:  true,
+			Message:  fmt.Sprintf("ran %d cpu workers for %ds (stress-ng)", workers, durationS),
 			Metadata: Params{"workers": strconv.Itoa(workers), "duration_s": strconv.Itoa(durationS), "output": out},
 		}, nil
 	}
@@ -51,8 +51,8 @@ func (p *CPUPlugin) Run(ctx context.Context, target string, params Params) (Resu
 	out, err := p.docker.Exec(ctx, target, cmd)
 	if err == nil {
 		return Result{
-			Success: true,
-			Message: fmt.Sprintf("ran %d cpu workers for %ds (stress-ng)", workers, durationS),
+			Success:  true,
+			Message:  fmt.Sprintf("ran %d cpu workers for %ds (stress-ng)", workers, durationS),
 			Metadata: Params{"workers": strconv.Itoa(workers), "duration_s": strconv.Itoa(durationS), "output": out},
 		}, nil
 	}
@@ -90,16 +90,19 @@ func (p *CPUPlugin) runCgroupThrottle(ctx context.Context, target string, quotaP
 		return Result{Success: false, Message: fmt.Sprintf("cgroup cpu throttle failed: %v", err)}, err
 	}
 
-	defer func() {
-		p.docker.UpdateContainer(context.Background(), target, map[string]any{
-			"CpuPeriod": origPeriod,
-			"CpuQuota":  origQuota,
-		})
-	}()
-
 	select {
 	case <-time.After(time.Duration(durationS) * time.Second):
 	case <-ctx.Done():
+	}
+	cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := p.docker.UpdateContainer(cleanupCtx, target, map[string]any{
+		"CpuPeriod": origPeriod, "CpuQuota": origQuota,
+	}); err != nil {
+		return Result{Success: false}, fmt.Errorf("restore CPU limits: %w", err)
+	}
+	if ctx.Err() != nil {
+		return Result{Success: false}, ctx.Err()
 	}
 
 	return Result{

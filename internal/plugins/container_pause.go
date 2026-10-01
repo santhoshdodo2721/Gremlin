@@ -42,6 +42,10 @@ func (p *ContainerPausePlugin) Run(ctx context.Context, target string, params Pa
 		return Result{Success: false, Message: fmt.Sprintf("unpause failed: %v", err)}, err
 	}
 
+	if ctx.Err() != nil {
+		return Result{Success: false}, ctx.Err()
+	}
+
 	return Result{
 		Success: true,
 		Message: fmt.Sprintf("paused and unpaused container %s after %ds", target, durationS),

@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -31,6 +32,10 @@ func (c *Controller) RunAttackWithHealthURL(ctx context.Context, attackName, tar
 		return fmt.Errorf("unknown attack %q (run gremlin status to list available attacks)", attackName)
 	}
 
+	if err := plugins.ValidateParams(attackName, target, params); err != nil {
+		return err
+	}
+
 	c.Log.Info("starting attack", "attack", attackName, "target", target, "health_url", healthURL)
 	start := time.Now()
 
@@ -39,23 +44,40 @@ func (c *Controller) RunAttackWithHealthURL(ctx context.Context, attackName, tar
 
 	recoveryMs := c.measureRecovery(ctx, healthURL)
 
-	success := runErr == nil && result.Success
+	if runErr == nil && !result.Success {
+		runErr = fmt.Errorf("attack did not succeed: %s", result.Message)
+	}
+	if runErr == nil && recoveryMs < 0 {
+		runErr = fmt.Errorf("service recovery could not be verified at %s", healthURL)
+	}
+	if runErr == nil && ctx.Err() != nil {
+		runErr = ctx.Err()
+	}
+	success := runErr == nil
+	recoveryStatus := "verified"
+	if healthURL == "" {
+		recoveryStatus = "skipped"
+	} else if recoveryMs < 0 {
+		recoveryStatus = "unverified"
+	}
 
 	report := reports.Report{
-		ID:         fmt.Sprintf("%s-%d", attackName, start.Unix()),
-		Attack:     attackName,
-		Target:     target,
-		StartedAt:  start,
-		DurationMs: durationMs,
-		RecoveryMs: recoveryMs,
-		Success:    success,
-		Message:    result.Message,
+		ID:             fmt.Sprintf("%s-%d", attackName, start.UnixNano()),
+		Attack:         attackName,
+		Target:         target,
+		StartedAt:      start,
+		DurationMs:     durationMs,
+		RecoveryMs:     recoveryMs,
+		RecoveryStatus: recoveryStatus,
+		Success:        success,
+		Message:        result.Message,
 	}
 	if runErr != nil {
 		report.Message = runErr.Error()
 	}
 	if err := c.Reports.Save(report); err != nil {
 		c.Log.Error("failed to save report", "error", err)
+		runErr = errors.Join(runErr, fmt.Errorf("save report: %w", err))
 	}
 
 	c.Log.Info("attack finished", "attack", attackName, "success", success,
@@ -69,24 +91,25 @@ func (c *Controller) measureRecovery(ctx context.Context, healthURL string) int6
 		return 0
 	}
 	start := time.Now()
-	deadline := start.Add(60 * time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
 	client := http.Client{Timeout: 2 * time.Second}
-
-	for time.Now().Before(deadline) {
-		select {
-		case <-ctx.Done():
+	for {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, healthURL, nil)
+		if err != nil {
 			return -1
-		default:
 		}
-		resp, err := client.Get(healthURL)
-		if err == nil && resp.StatusCode == http.StatusOK {
-			resp.Body.Close()
-			return time.Since(start).Milliseconds()
-		}
+		resp, err := client.Do(req)
 		if resp != nil {
 			resp.Body.Close()
 		}
-		time.Sleep(500 * time.Millisecond)
+		if err == nil && resp.StatusCode == http.StatusOK {
+			return time.Since(start).Milliseconds()
+		}
+		select {
+		case <-ctx.Done():
+			return -1
+		case <-time.After(500 * time.Millisecond):
+		}
 	}
-	return -1
 }
